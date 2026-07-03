@@ -13,7 +13,9 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import {
   createComment,
+  deleteComment,
   getCommentsForCard,
+  updateComment,
   uploadCommentImages,
 } from "@/lib/comments";
 import { formatDate } from "@/lib/profiles";
@@ -44,10 +46,17 @@ function buildImageList(comments: CommentWithAuthor[]): SliderImage[] {
   return images;
 }
 
+interface ReplyTarget {
+  id: string;
+  authorEmail: string;
+  bodyPreview: string;
+}
+
 interface CardCommentsContextValue {
   comments: CommentWithAuthor[];
   allImages: SliderImage[];
   imageIndexRangesByCommentId: Map<string, number[]>;
+  commentsById: Map<string, CommentWithAuthor>;
   loading: boolean;
   body: string;
   setBody: (value: string) => void;
@@ -56,6 +65,8 @@ interface CardCommentsContextValue {
   submitting: boolean;
   error: string | null;
   canSubmit: boolean;
+  userId: string;
+  replyingTo: ReplyTarget | null;
   openSlider: (index: number) => void;
   addImageFiles: (files: FileList | File[]) => void;
   removeImageFile: (index: number) => void;
@@ -63,6 +74,10 @@ interface CardCommentsContextValue {
   handleDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
   handleDrop: (e: React.DragEvent<HTMLDivElement>) => void;
   handleSubmit: (e: React.FormEvent) => void;
+  startReply: (target: ReplyTarget) => void;
+  clearReply: () => void;
+  handleUpdateComment: (commentId: string, body: string) => Promise<void>;
+  handleDeleteComment: (commentId: string) => Promise<void>;
 }
 
 const CardCommentsContext = createContext<CardCommentsContextValue | null>(null);
@@ -98,6 +113,7 @@ export function CardCommentsProvider({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sliderIndex, setSliderIndex] = useState<number | null>(null);
+  const [replyingTo, setReplyingTo] = useState<ReplyTarget | null>(null);
 
   const loadComments = useCallback(async () => {
     setLoading(true);
@@ -117,6 +133,10 @@ export function CardCommentsProvider({
   }, [loadComments]);
 
   const allImages = useMemo(() => buildImageList(comments), [comments]);
+
+  const commentsById = useMemo(() => {
+    return new Map(comments.map((comment) => [comment.id, comment]));
+  }, [comments]);
 
   const imageIndexRangesByCommentId = useMemo(() => {
     const map = new Map<string, number[]>();
@@ -169,6 +189,44 @@ export function CardCommentsProvider({
     }
   };
 
+  const startReply = (target: ReplyTarget) => {
+    setReplyingTo(target);
+    setError(null);
+  };
+
+  const clearReply = () => {
+    setReplyingTo(null);
+  };
+
+  const handleUpdateComment = async (commentId: string, nextBody: string) => {
+    setError(null);
+    try {
+      const supabase = createClient();
+      const updated = await updateComment(supabase, commentId, nextBody);
+      setComments((prev) =>
+        prev.map((comment) => (comment.id === commentId ? updated : comment))
+      );
+    } catch {
+      setError("Failed to update comment.");
+      throw new Error("Failed to update comment.");
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    setError(null);
+    try {
+      const supabase = createClient();
+      await deleteComment(supabase, commentId);
+      setComments((prev) => prev.filter((comment) => comment.id !== commentId));
+      if (replyingTo?.id === commentId) {
+        setReplyingTo(null);
+      }
+    } catch {
+      setError("Failed to delete comment.");
+      throw new Error("Failed to delete comment.");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedBody = body.trim();
@@ -190,11 +248,13 @@ export function CardCommentsProvider({
         userId,
         body: trimmedBody,
         imageUrls,
+        parentCommentId: replyingTo?.id ?? null,
       });
 
       setComments((prev) => [...prev, comment]);
       setBody("");
       setImageFiles([]);
+      setReplyingTo(null);
       onCommentAdded();
     } catch {
       setError("Failed to post comment.");
@@ -209,6 +269,7 @@ export function CardCommentsProvider({
     comments,
     allImages,
     imageIndexRangesByCommentId,
+    commentsById,
     loading,
     body,
     setBody,
@@ -217,6 +278,8 @@ export function CardCommentsProvider({
     submitting,
     error,
     canSubmit,
+    userId,
+    replyingTo,
     openSlider,
     addImageFiles,
     removeImageFile,
@@ -224,6 +287,10 @@ export function CardCommentsProvider({
     handleDragLeave,
     handleDrop,
     handleSubmit,
+    startReply,
+    clearReply,
+    handleUpdateComment,
+    handleDeleteComment,
   };
 
   return (
@@ -253,11 +320,227 @@ export function CardCommentGallery() {
   );
 }
 
+function CommentBubble({
+  comment,
+  parentComment,
+  imageIndexes,
+}: {
+  comment: CommentWithAuthor;
+  parentComment?: CommentWithAuthor | null;
+  imageIndexes: number[];
+}) {
+  const {
+    allImages,
+    userId,
+    openSlider,
+    startReply,
+    handleUpdateComment,
+    handleDeleteComment,
+  } = useCardComments();
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editBody, setEditBody] = useState(comment.body);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const isOwner = comment.user_id === userId;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setEditBody(comment.body);
+    }
+  }, [comment.body, isEditing]);
+
+  const handleSaveEdit = async () => {
+    const trimmed = editBody.trim();
+    if (!trimmed) return;
+
+    setSaving(true);
+    try {
+      await handleUpdateComment(comment.id, trimmed);
+      setIsEditing(false);
+      setMenuOpen(false);
+    } catch {
+      // Error surfaced via context
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await handleDeleteComment(comment.id);
+      setMenuOpen(false);
+    } catch {
+      // Error surfaced via context
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleReply = () => {
+    startReply({
+      id: comment.id,
+      authorEmail: authorEmail(comment),
+      bodyPreview: comment.body.trim() || "Image attachment",
+    });
+    setMenuOpen(false);
+  };
+
+  return (
+    <article className="comment-item">
+      <div className="comment-avatar" aria-hidden="true">
+        <UserSilhouette size={20} />
+      </div>
+      <div className="comment-content">
+        <div className="comment-meta">
+          <div className="comment-meta-main">
+            <strong>{authorEmail(comment)}</strong>
+            <span>{formatDate(comment.created_at)}</span>
+          </div>
+          <div className="comment-menu" ref={menuRef}>
+            <button
+              type="button"
+              className={`comment-menu-trigger${menuOpen ? " open" : ""}`}
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              aria-label="Comment options"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="5" cy="12" r="2" />
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="19" cy="12" r="2" />
+              </svg>
+            </button>
+            {menuOpen && (
+              <div className="comment-menu-dropdown" role="menu">
+                <button type="button" className="comment-menu-item" role="menuitem" onClick={handleReply}>
+                  Reply
+                </button>
+                {isOwner && (
+                  <>
+                    <button
+                      type="button"
+                      className="comment-menu-item"
+                      role="menuitem"
+                      onClick={() => {
+                        setIsEditing(true);
+                        setMenuOpen(false);
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="comment-menu-item comment-menu-item-danger"
+                      role="menuitem"
+                      onClick={handleDelete}
+                      disabled={deleting}
+                    >
+                      {deleting ? "Deleting..." : "Delete"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {parentComment && (
+          <div className="comment-reply-context">
+            Replying to <strong>{authorEmail(parentComment)}</strong>
+            {parentComment.body && (
+              <span className="comment-reply-snippet">{parentComment.body}</span>
+            )}
+          </div>
+        )}
+
+        {isEditing ? (
+          <div className="comment-edit-form">
+            <textarea
+              value={editBody}
+              onChange={(e) => setEditBody(e.target.value)}
+              rows={3}
+              className="comment-edit-textarea"
+              autoFocus
+            />
+            <div className="comment-edit-actions">
+              <button
+                type="button"
+                className="secondary-btn-sm"
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditBody(comment.body);
+                }}
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="submit-btn comment-edit-save"
+                onClick={handleSaveEdit}
+                disabled={saving || !editBody.trim()}
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {comment.body && <p className="comment-body">{comment.body}</p>}
+            {imageIndexes.length > 0 && (
+              <div className="comment-image-chips">
+                {imageIndexes.map((imageIndex) => (
+                  <button
+                    key={imageIndex}
+                    type="button"
+                    className="image-link-chip image-link-chip-inline"
+                    onClick={() => openSlider(imageIndex)}
+                  >
+                    {allImages[imageIndex]?.label ?? `Image ${imageIndex + 1}`}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </article>
+  );
+}
+
 export function CardCommentPanel() {
   const {
     comments,
     allImages,
     imageIndexRangesByCommentId,
+    commentsById,
     loading,
     body,
     setBody,
@@ -266,7 +549,8 @@ export function CardCommentPanel() {
     submitting,
     error,
     canSubmit,
-    openSlider,
+    replyingTo,
+    clearReply,
     addImageFiles,
     removeImageFile,
     handleDragOver,
@@ -291,6 +575,12 @@ export function CardCommentPanel() {
     adjustTextareaHeight();
   }, [body, adjustTextareaHeight]);
 
+  useEffect(() => {
+    if (replyingTo) {
+      textareaRef.current?.focus();
+    }
+  }, [replyingTo]);
+
   return (
     <div className="card-comments-panel">
       {loading ? (
@@ -301,34 +591,17 @@ export function CardCommentPanel() {
         <div className="comments-list">
           {comments.map((comment) => {
             const imageIndexes = imageIndexRangesByCommentId.get(comment.id) ?? [];
+            const parentComment = comment.parent_comment_id
+              ? commentsById.get(comment.parent_comment_id)
+              : null;
 
             return (
-              <article key={comment.id} className="comment-item">
-                <div className="comment-avatar" aria-hidden="true">
-                  <UserSilhouette size={20} />
-                </div>
-                <div className="comment-content">
-                  <div className="comment-meta">
-                    <strong>{authorEmail(comment)}</strong>
-                    <span>{formatDate(comment.created_at)}</span>
-                  </div>
-                  {comment.body && <p className="comment-body">{comment.body}</p>}
-                  {imageIndexes.length > 0 && (
-                    <div className="comment-image-chips">
-                      {imageIndexes.map((imageIndex) => (
-                        <button
-                          key={imageIndex}
-                          type="button"
-                          className="image-link-chip image-link-chip-inline"
-                          onClick={() => openSlider(imageIndex)}
-                        >
-                          {allImages[imageIndex]?.label ?? `Image ${imageIndex + 1}`}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </article>
+              <CommentBubble
+                key={comment.id}
+                comment={comment}
+                parentComment={parentComment}
+                imageIndexes={imageIndexes}
+              />
             );
           })}
         </div>
@@ -336,6 +609,22 @@ export function CardCommentPanel() {
 
       <form onSubmit={handleSubmit} className="comment-form-inline">
         {error && <div className="error-msg">{error}</div>}
+        {replyingTo && (
+          <div className="comment-reply-banner">
+            <div className="comment-reply-banner-text">
+              Replying to <strong>{replyingTo.authorEmail}</strong>
+              <span className="comment-reply-snippet">{replyingTo.bodyPreview}</span>
+            </div>
+            <button
+              type="button"
+              className="comment-reply-cancel"
+              onClick={clearReply}
+              aria-label="Cancel reply"
+            >
+              ×
+            </button>
+          </div>
+        )}
         {imageFiles.length > 0 && (
           <div className="pending-image-row">
             {imageFiles.map((file, index) => (
@@ -399,7 +688,11 @@ export function CardCommentPanel() {
               }
             }}
             placeholder={
-              isDraggingOver ? "Drop images to attach..." : "Write a comment..."
+              isDraggingOver
+                ? "Drop images to attach..."
+                : replyingTo
+                  ? `Reply to ${replyingTo.authorEmail}...`
+                  : "Write a comment..."
             }
             rows={1}
             className="comment-input-textarea"

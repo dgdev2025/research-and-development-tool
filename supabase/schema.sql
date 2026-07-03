@@ -27,6 +27,7 @@ create table public.comments (
   user_id uuid not null references public.profiles (id) on delete cascade,
   body text not null default '',
   image_url text,
+  parent_comment_id uuid references public.comments (id) on delete set null,
   created_at timestamptz not null default now()
 );
 
@@ -41,6 +42,7 @@ create table public.comment_images (
 create index feeds_uploaded_by_idx on public.feeds (uploaded_by);
 create index feeds_updated_at_idx on public.feeds (updated_at desc);
 create index comments_feed_card_idx on public.comments (feed_id, card_id, created_at);
+create index comments_parent_comment_id_idx on public.comments (parent_comment_id);
 create index comment_images_comment_id_idx on public.comment_images (comment_id);
 
 create table public.user_hidden_cards (
@@ -191,8 +193,24 @@ create policy "Users can delete own comments"
   to authenticated
   using (auth.uid() = user_id);
 
+create policy "Users can update own comments"
+  on public.comments for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
 create policy "Admins can delete any comment"
   on public.comments for delete
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role = 'admin'
+    )
+  );
+
+create policy "Admins can update any comment"
+  on public.comments for update
   to authenticated
   using (
     exists (

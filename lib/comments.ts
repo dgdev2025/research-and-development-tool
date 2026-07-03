@@ -8,6 +8,7 @@ const COMMENT_SELECT = `
   user_id,
   body,
   image_url,
+  parent_comment_id,
   created_at,
   author:profiles!user_id (
     id,
@@ -65,6 +66,7 @@ export async function createComment(
     userId: string;
     body: string;
     imageUrls?: string[];
+    parentCommentId?: string | null;
   }
 ): Promise<CommentWithAuthor> {
   const body = params.body.trim();
@@ -81,6 +83,7 @@ export async function createComment(
       card_id: params.cardId,
       user_id: params.userId,
       body,
+      parent_comment_id: params.parentCommentId ?? null,
     })
     .select(
       `
@@ -90,6 +93,7 @@ export async function createComment(
       user_id,
       body,
       image_url,
+      parent_comment_id,
       created_at,
       author:profiles!user_id (
         id,
@@ -152,4 +156,33 @@ export async function uploadCommentImages(
     urls.push(await uploadCommentImage(supabase, userId, file));
   }
   return urls;
+}
+
+export async function updateComment(
+  supabase: SupabaseClient,
+  commentId: string,
+  body: string
+): Promise<CommentWithAuthor> {
+  const trimmedBody = body.trim();
+  if (!trimmedBody) {
+    throw new Error("Comment cannot be empty.");
+  }
+
+  const { data, error } = await supabase
+    .from("comments")
+    .update({ body: trimmedBody })
+    .eq("id", commentId)
+    .select(COMMENT_SELECT)
+    .single();
+
+  if (error) throw error;
+  return data as unknown as CommentWithAuthor;
+}
+
+export async function deleteComment(
+  supabase: SupabaseClient,
+  commentId: string
+): Promise<void> {
+  const { error } = await supabase.from("comments").delete().eq("id", commentId);
+  if (error) throw error;
 }

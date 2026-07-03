@@ -55,7 +55,7 @@ export function ItemCard({
 
   const toggleCardOpen = () => setCardOpen((prev) => !prev);
 
-  const handleHeaderKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLSpanElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       toggleCardOpen();
@@ -66,15 +66,15 @@ export function ItemCard({
     <article
       className={`item-card${cardOpen ? " comments-open card-open" : ""}${isHidden ? " is-hidden-card" : ""}`}
     >
-      <div
-        className="item-card-header"
-        role="button"
-        tabIndex={0}
-        aria-expanded={cardOpen}
-        onClick={toggleCardOpen}
-        onKeyDown={handleHeaderKeyDown}
-      >
-        <span className="item-card-title">
+      <div className="item-card-header">
+        <span
+          className="item-card-title"
+          role="button"
+          tabIndex={0}
+          aria-expanded={cardOpen}
+          onClick={toggleCardOpen}
+          onKeyDown={handleTitleKeyDown}
+        >
           <svg
             className={`card-chevron${cardOpen ? " open" : ""}`}
             width="14"

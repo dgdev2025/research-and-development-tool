@@ -37,6 +37,7 @@ export interface CommentRow {
   user_id: string;
   body: string;
   image_url: string | null;
+  parent_comment_id: string | null;
   created_at: string;
 }
 
