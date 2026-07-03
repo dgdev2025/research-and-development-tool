@@ -28,7 +28,7 @@ import type { CommentWithAuthor } from "@/lib/types";
 import type { FeedItem } from "@/lib/parseFeed";
 import { ImageSliderModal, type SliderImage } from "./ImageSliderModal";
 import { GalleryThumbSlider } from "./GalleryThumbSlider";
-import { UserSilhouette } from "./UserSilhouette";
+import { InitialAvatar } from "./InitialAvatar";
 
 function authorEmail(comment: CommentWithAuthor): string {
   return comment.author?.email ?? "Unknown";
@@ -489,9 +489,7 @@ function CommentBubble({
 
   return (
     <article className="comment-item">
-      <div className="comment-avatar" aria-hidden="true">
-        <UserSilhouette size={20} />
-      </div>
+      <InitialAvatar profile={comment.author} size={36} className="comment-avatar" />
       <div className="comment-content">
         <div className="comment-meta">
           <div className="comment-meta-main">
