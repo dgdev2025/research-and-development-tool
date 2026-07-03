@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { needsPasswordSetup } from "@/lib/auth";
 import { getSupabaseEnv, isSupabaseConfigured } from "@/lib/env";
 
-const ADMIN_ROUTES = ["/dashboard", "/feeds/new", "/settings"];
+const ADMIN_ONLY_ROUTES = ["/feeds/new", "/settings"];
 
 async function getUserRole(
   supabase: ReturnType<typeof createServerClient>,
@@ -114,7 +114,7 @@ export async function updateSession(request: NextRequest) {
   if (user) {
     const role = await getUserRole(supabase, user.id);
     const mustSetPassword = needsPasswordSetup(user);
-    const isAdminRoute = ADMIN_ROUTES.some(
+    const isAdminOnlyRoute = ADMIN_ONLY_ROUTES.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`)
     );
 
@@ -127,16 +127,12 @@ export async function updateSession(request: NextRequest) {
 
     if (!mustSetPassword && isSetPasswordRoute) {
       const url = request.nextUrl.clone();
-      url.pathname = role === "admin" ? "/dashboard" : "/login";
-      if (role !== "admin") {
-        url.searchParams.set("message", "contributor-access");
-      } else {
-        url.search = "";
-      }
+      url.pathname = role === "admin" ? "/dashboard" : "/dashboard";
+      url.search = "";
       return NextResponse.redirect(url);
     }
 
-    if (isAdminRoute && role !== "admin") {
+    if (isAdminOnlyRoute && role !== "admin") {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("message", "contributor-access");
@@ -165,7 +161,8 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url);
       }
 
-      url.searchParams.set("message", "contributor-access");
+      url.pathname = "/dashboard";
+      url.search = "";
       return NextResponse.redirect(url);
     }
   }

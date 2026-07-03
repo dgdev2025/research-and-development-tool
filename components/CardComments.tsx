@@ -14,7 +14,12 @@ import { createClient } from "@/lib/supabase/client";
 import {
   createComment,
   deleteComment,
+  getCommentById,
   getCommentsForCard,
+  INITIAL_VISIBLE_COMMENTS,
+  LOAD_MORE_COMMENTS,
+  mergeComment,
+  sortCommentsAscending,
   updateComment,
   uploadCommentImages,
 } from "@/lib/comments";
@@ -120,7 +125,7 @@ export function CardCommentsProvider({
     try {
       const supabase = createClient();
       const data = await getCommentsForCard(supabase, feedId, card.id);
-      setComments(data);
+      setComments(sortCommentsAscending(data));
     } catch {
       setError("Failed to load comments.");
     } finally {
@@ -131,6 +136,79 @@ export function CardCommentsProvider({
   useEffect(() => {
     loadComments();
   }, [loadComments]);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    const upsertComment = async (commentId: string) => {
+      const comment = await getCommentById(supabase, commentId);
+      if (!comment || comment.feed_id !== feedId || comment.card_id !== card.id) {
+        return;
+      }
+      setComments((prev) => mergeComment(prev, comment));
+    };
+
+    const channel = supabase
+      .channel(`card-comments-${feedId}-${card.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "comments",
+          filter: `feed_id=eq.${feedId}`,
+        },
+        (payload) => {
+          const row = payload.new as { id: string; card_id: string };
+          if (row.card_id !== card.id) return;
+          void upsertComment(row.id);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "comments",
+          filter: `feed_id=eq.${feedId}`,
+        },
+        (payload) => {
+          const row = payload.new as { id: string; card_id: string };
+          if (row.card_id !== card.id) return;
+          void upsertComment(row.id);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "comments",
+          filter: `feed_id=eq.${feedId}`,
+        },
+        (payload) => {
+          const row = payload.old as { id: string };
+          setComments((prev) => prev.filter((comment) => comment.id !== row.id));
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "comment_images",
+        },
+        (payload) => {
+          const row = payload.new as { comment_id: string };
+          void upsertComment(row.comment_id);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [feedId, card.id]);
 
   const allImages = useMemo(() => buildImageList(comments), [comments]);
 
@@ -203,9 +281,7 @@ export function CardCommentsProvider({
     try {
       const supabase = createClient();
       const updated = await updateComment(supabase, commentId, nextBody);
-      setComments((prev) =>
-        prev.map((comment) => (comment.id === commentId ? updated : comment))
-      );
+      setComments((prev) => mergeComment(prev, updated));
     } catch {
       setError("Failed to update comment.");
       throw new Error("Failed to update comment.");
@@ -251,7 +327,7 @@ export function CardCommentsProvider({
         parentCommentId: replyingTo?.id ?? null,
       });
 
-      setComments((prev) => [...prev, comment]);
+      setComments((prev) => mergeComment(prev, comment));
       setBody("");
       setImageFiles([]);
       setReplyingTo(null);
@@ -559,7 +635,20 @@ export function CardCommentPanel() {
     handleSubmit,
   } = useCardComments();
 
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COMMENTS);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const commentsNewestFirst = useMemo(
+    () =>
+      [...comments].sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      ),
+    [comments]
+  );
+
+  const displayedComments = commentsNewestFirst.slice(0, visibleCount);
+  const hiddenCount = Math.max(commentsNewestFirst.length - visibleCount, 0);
 
   const adjustTextareaHeight = useCallback(() => {
     const textarea = textareaRef.current;
@@ -589,7 +678,7 @@ export function CardCommentPanel() {
         <p className="comments-empty">No comments yet. Be the first to comment.</p>
       ) : (
         <div className="comments-list">
-          {comments.map((comment) => {
+          {displayedComments.map((comment) => {
             const imageIndexes = imageIndexRangesByCommentId.get(comment.id) ?? [];
             const parentComment = comment.parent_comment_id
               ? commentsById.get(comment.parent_comment_id)
@@ -605,6 +694,18 @@ export function CardCommentPanel() {
             );
           })}
         </div>
+      )}
+
+      {!loading && hiddenCount > 0 && (
+        <button
+          type="button"
+          className="comments-load-more"
+          onClick={() =>
+            setVisibleCount((count) => count + LOAD_MORE_COMMENTS)
+          }
+        >
+          View more comments ({hiddenCount} older)
+        </button>
       )}
 
       <form onSubmit={handleSubmit} className="comment-form-inline">

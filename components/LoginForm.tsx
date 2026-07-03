@@ -41,17 +41,7 @@ export function LoginForm({ redirectTo, message }: LoginFormProps) {
       if (redirectTo?.startsWith("/feeds/")) {
         router.push(redirectTo);
       } else {
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", (await supabase.auth.getUser()).data.user?.id ?? "")
-          .single();
-
-        if (profileData?.role === "admin") {
-          router.push("/dashboard");
-        } else {
-          router.replace("/login?message=contributor-access");
-        }
+        router.push("/dashboard");
       }
       router.refresh();
     } catch (err) {
@@ -75,8 +65,8 @@ export function LoginForm({ redirectTo, message }: LoginFormProps) {
 
         {message === "contributor-access" && (
           <div className="info-msg">
-            Contributors can only access feeds via shared links. Open a feed link
-            from your team to sign in and comment.
+            Contributors can view feeds on the dashboard and comment on cards.
+            Import and settings are limited to admins.
           </div>
         )}
 

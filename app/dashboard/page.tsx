@@ -16,10 +16,9 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   const profile = await getProfile(supabase, user.id);
-  if (profile?.role !== "admin") {
-    redirect("/login?message=contributor-access");
-  }
+  if (!profile) redirect("/login");
 
+  const isAdmin = profile.role === "admin";
   const feeds = await getFeeds(supabase);
 
   return (
@@ -29,14 +28,20 @@ export default async function DashboardPage() {
       <div className="page-header">
         <div>
           <h1>Dashboard</h1>
-          <p>All imported research feeds</p>
+          <p>
+            {isAdmin
+              ? "All imported research feeds"
+              : "View research feeds and open them to comment"}
+          </p>
         </div>
-        <Link href="/feeds/new" className="submit-btn">
-          Import Feed
-        </Link>
+        {isAdmin && (
+          <Link href="/feeds/new" className="submit-btn">
+            Import Feed
+          </Link>
+        )}
       </div>
 
-      <DashboardTable feeds={feeds} isAdmin />
+      <DashboardTable feeds={feeds} isAdmin={isAdmin} />
     </AppShell>
   );
 }

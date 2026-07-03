@@ -34,7 +34,7 @@ export default async function FeedPage({ params }: FeedPageProps) {
     <AppShell>
       <div className="feed-meta-bar">
         <div className="feed-meta-left">
-          <FeedBackLink show={isAdmin} />
+          <FeedBackLink show />
           <div>
             <p className="feed-record-title">{feed.title}</p>
             <p className="feed-record-meta">

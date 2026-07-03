@@ -19,7 +19,7 @@ export default async function SetPasswordPage() {
     if (profile?.role === "admin") {
       redirect("/dashboard");
     }
-    redirect("/login?message=contributor-access");
+    redirect("/dashboard");
   }
 
   return (

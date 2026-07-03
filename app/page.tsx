@@ -15,5 +15,5 @@ export default async function HomePage() {
     redirect("/dashboard");
   }
 
-  redirect("/login?message=contributor-access");
+  redirect("/dashboard");
 }

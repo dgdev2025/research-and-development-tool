@@ -562,6 +562,28 @@ button {
   margin-top: auto;
 }
 
+.comments-load-more {
+  flex-shrink: 0;
+  width: 100%;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+
+.comments-load-more:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
 .item-card.comments-open {
   padding-bottom: 1.25rem;
 }

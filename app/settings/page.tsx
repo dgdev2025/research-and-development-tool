@@ -42,8 +42,8 @@ export default async function SettingsPage() {
           feeds, and manage users.
         </p>
         <p>
-          <strong>Contributor</strong> — can view shared feed links and comment
-          on cards.
+          <strong>Contributor</strong> — can view the dashboard, open feeds, and
+          comment on cards.
         </p>
         <p>
           Invited users must set a password from the invite link before they

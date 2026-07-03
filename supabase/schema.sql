@@ -302,3 +302,6 @@ create policy "Users can delete own comment images"
   on storage.objects for delete
   to authenticated
   using (bucket_id = 'comment-images' and auth.uid()::text = (storage.foldername(name))[1]);
+
+alter publication supabase_realtime add table public.comments;
+alter publication supabase_realtime add table public.comment_images;

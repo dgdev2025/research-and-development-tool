@@ -47,7 +47,7 @@ export function AppNav({ profile }: AppNavProps) {
   }, [menuOpen]);
 
   const links = [
-    ...(isAdmin ? [{ href: "/dashboard", label: "Dashboard" }] : []),
+    { href: "/dashboard", label: "Dashboard" },
     ...(isAdmin ? [{ href: "/feeds/new", label: "Import Feed" }] : []),
     ...(isAdmin ? [{ href: "/settings", label: "Settings" }] : []),
   ];
@@ -55,7 +55,7 @@ export function AppNav({ profile }: AppNavProps) {
   return (
     <nav className="app-nav">
       <div className="app-nav-inner">
-        <AppLogo href={isAdmin ? "/dashboard" : undefined} />
+        <AppLogo href="/dashboard" />
 
         <div className="app-nav-menu">
           {links.map((link) => (

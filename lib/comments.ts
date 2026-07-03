@@ -23,6 +23,9 @@ const COMMENT_SELECT = `
   )
 `;
 
+export const INITIAL_VISIBLE_COMMENTS = 5;
+export const LOAD_MORE_COMMENTS = 10;
+
 export async function getCommentsForCard(
   supabase: SupabaseClient,
   feedId: string,
@@ -38,6 +41,42 @@ export async function getCommentsForCard(
 
   if (error) throw error;
   return (data ?? []) as unknown as CommentWithAuthor[];
+}
+
+export async function getCommentById(
+  supabase: SupabaseClient,
+  commentId: string
+): Promise<CommentWithAuthor | null> {
+  const { data, error } = await supabase
+    .from("comments")
+    .select(COMMENT_SELECT)
+    .eq("id", commentId)
+    .single();
+
+  if (error) return null;
+  return data as unknown as CommentWithAuthor;
+}
+
+export function sortCommentsAscending(
+  comments: CommentWithAuthor[]
+): CommentWithAuthor[] {
+  return [...comments].sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+}
+
+export function mergeComment(
+  comments: CommentWithAuthor[],
+  comment: CommentWithAuthor
+): CommentWithAuthor[] {
+  const existingIndex = comments.findIndex((item) => item.id === comment.id);
+  if (existingIndex >= 0) {
+    const next = [...comments];
+    next[existingIndex] = comment;
+    return sortCommentsAscending(next);
+  }
+  return sortCommentsAscending([...comments, comment]);
 }
 
 export async function getCommentCountsByFeed(

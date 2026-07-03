@@ -46,7 +46,7 @@ export function SetPasswordForm() {
       if (data.role === "admin") {
         router.push("/dashboard");
       } else {
-        router.replace("/login?message=contributor-access");
+        router.replace("/dashboard");
       }
       router.refresh();
     } catch (err) {
