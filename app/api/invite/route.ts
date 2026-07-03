@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getProfile } from "@/lib/profiles";
-import { getSupabaseEnv, isServiceRoleConfigured } from "@/lib/env";
+import { getSupabaseEnv, isServiceRoleConfigured, getSiteUrl } from "@/lib/env";
 import type { UserRole } from "@/lib/types";
 
 interface InviteBody {
@@ -44,14 +44,14 @@ export async function POST(request: Request) {
     }
 
     const admin = createAdminClient();
-    const { siteUrl } = getSupabaseEnv();
+    const siteUrl = getSiteUrl(request);
 
     const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
       data: {
         full_name: fullName || email.split("@")[0],
         role,
       },
-      redirectTo: `${siteUrl}/login`,
+      redirectTo: `${siteUrl}/auth/callback?next=/login`,
     });
 
     if (error) {

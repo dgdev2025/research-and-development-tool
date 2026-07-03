@@ -52,28 +52,30 @@ export function InviteUserForm() {
       {success && <div className="success-msg">{success}</div>}
 
       <form onSubmit={handleSubmit} className="invite-form">
-        <label>
+        <label className="invite-field-group">
           Email
           <input
             type="email"
+            className="invite-field"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
         </label>
-        <label>
+        <label className="invite-field-group">
           Full name
           <input
             type="text"
+            className="invite-field"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             placeholder="Optional"
           />
         </label>
-        <label>
+        <label className="invite-field-group">
           Role
           <select
-            className="role-select"
+            className="invite-field"
             value={role}
             onChange={(e) => setRole(e.target.value as UserRole)}
           >
@@ -81,7 +83,7 @@ export function InviteUserForm() {
             <option value="admin">Admin</option>
           </select>
         </label>
-        <button type="submit" className="submit-btn" disabled={loading}>
+        <button type="submit" className="submit-btn invite-submit-btn" disabled={loading}>
           {loading ? "Sending..." : "Send invite"}
         </button>
       </form>

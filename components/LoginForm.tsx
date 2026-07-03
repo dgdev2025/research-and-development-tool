@@ -15,8 +15,6 @@ export function LoginForm({ redirectTo, message }: LoginFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -29,30 +27,15 @@ export function LoginForm({ redirectTo, message }: LoginFormProps) {
 
     try {
       const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (isSignUp) {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName },
-          },
-        });
-        if (signUpError) {
-          setError(signUpError.message);
-          setLoading(false);
-          return;
-        }
-      } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (signInError) {
-          setError(signInError.message);
-          setLoading(false);
-          return;
-        }
+      if (signInError) {
+        setError(signInError.message);
+        setLoading(false);
+        return;
       }
 
       if (redirectTo?.startsWith("/feeds/")) {
@@ -83,12 +66,7 @@ export function LoginForm({ redirectTo, message }: LoginFormProps) {
 
   return (
     <>
-      {loading && (
-        <PageLoader
-          overlay
-          message={isSignUp ? "Creating your account..." : "Signing you in..."}
-        />
-      )}
+      {loading && <PageLoader overlay message="Signing you in..." />}
 
       <div className="auth-card">
         <div className="auth-logo-wrap">
@@ -102,25 +80,11 @@ export function LoginForm({ redirectTo, message }: LoginFormProps) {
           </div>
         )}
 
-        <p className="auth-subtitle">
-          {isSignUp ? "Create your account" : "Sign in to continue"}
-        </p>
+        <p className="auth-subtitle">Sign in to continue</p>
 
         {error && <div className="error-msg">{error}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
-          {isSignUp && (
-            <label>
-              Full name
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </label>
-          )}
           <label>
             Email
             <input
@@ -143,23 +107,9 @@ export function LoginForm({ redirectTo, message }: LoginFormProps) {
             />
           </label>
           <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? "Please wait..." : isSignUp ? "Sign up" : "Sign in"}
+            {loading ? "Please wait..." : "Sign in"}
           </button>
         </form>
-
-        <button
-          type="button"
-          className="text-btn"
-          disabled={loading}
-          onClick={() => {
-            setIsSignUp(!isSignUp);
-            setError(null);
-          }}
-        >
-          {isSignUp
-            ? "Already have an account? Sign in"
-            : "Need an account? Sign up"}
-        </button>
       </div>
     </>
   );

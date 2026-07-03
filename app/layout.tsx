@@ -13,6 +13,11 @@ const roboto = Roboto({
 export const metadata: Metadata = {
   title: "R&D Feed Organizer",
   description: "Process weekly research feeds into organized category cards",
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

@@ -23,7 +23,9 @@ async function getUserRole(
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAuthRoute = pathname === "/login";
-  const isPublicRoute = isAuthRoute || pathname === "/api/health";
+  const isAuthCallback = pathname === "/auth/callback";
+  const isPublicRoute =
+    isAuthRoute || isAuthCallback || pathname === "/api/health";
 
   if (!isSupabaseConfigured()) {
     if (isPublicRoute) {
