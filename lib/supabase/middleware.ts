@@ -1,0 +1,112 @@
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+import { getSupabaseEnv, isSupabaseConfigured } from "@/lib/env";
+
+const ADMIN_ROUTES = ["/dashboard", "/feeds/new", "/settings"];
+
+async function getUserRole(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string
+): Promise<"admin" | "contributor" | null> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .single();
+
+  if (data?.role === "admin" || data?.role === "contributor") {
+    return data.role;
+  }
+  return null;
+}
+
+export async function updateSession(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const isAuthRoute = pathname === "/login";
+  const isPublicRoute = isAuthRoute || pathname === "/api/health";
+
+  if (!isSupabaseConfigured()) {
+    if (isPublicRoute) {
+      return NextResponse.next({ request });
+    }
+
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  let supabaseResponse = NextResponse.next({ request });
+  const { url, anonKey } = getSupabaseEnv();
+
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value)
+        );
+        supabaseResponse = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options)
+        );
+      },
+    },
+  });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user && !isPublicRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    if (pathname.startsWith("/feeds/")) {
+      url.searchParams.set("redirect", pathname);
+    }
+    return NextResponse.redirect(url);
+  }
+
+  if (user) {
+    const role = await getUserRole(supabase, user.id);
+    const isAdminRoute = ADMIN_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`)
+    );
+
+    if (isAdminRoute && role !== "admin") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("message", "contributor-access");
+      return NextResponse.redirect(url);
+    }
+
+    if (isAuthRoute) {
+      const redirectTo = request.nextUrl.searchParams.get("redirect");
+      const message = request.nextUrl.searchParams.get("message");
+
+      if (message === "contributor-access") {
+        return supabaseResponse;
+      }
+
+      const url = request.nextUrl.clone();
+
+      if (redirectTo?.startsWith("/feeds/")) {
+        url.pathname = redirectTo;
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+
+      if (role === "admin") {
+        url.pathname = "/dashboard";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+
+      url.searchParams.set("message", "contributor-access");
+      return NextResponse.redirect(url);
+    }
+  }
+
+  return supabaseResponse;
+}

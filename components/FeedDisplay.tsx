@@ -1,0 +1,222 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import type { FeedCategory, FeedItem, ParsedFeed } from "@/lib/parseFeed";
+import {
+  getHiddenCardIds,
+  migrateLocalPreferencesIfNeeded,
+  setCardHidden,
+} from "@/lib/feedPreferences";
+import { createClient } from "@/lib/supabase/client";
+import { CategorySection } from "./CategorySection";
+import { useAutoSaveFeed } from "@/hooks/useAutoSaveFeed";
+
+interface FeedDisplayProps {
+  feedId: string;
+  feed: ParsedFeed;
+  userId: string;
+  canReorder: boolean;
+  commentCounts: Record<string, number>;
+  onFeedChange: (feed: ParsedFeed) => void;
+  onCommentCountChange: (cardId: string, delta: number) => void;
+}
+
+function countItems(feed: ParsedFeed): number {
+  return feed.categories.reduce((total, cat) => {
+    const subTotal = cat.subsections.reduce((s, sub) => s + sub.items.length, 0);
+    return total + cat.items.length + subTotal;
+  }, 0);
+}
+
+function updateCategory(
+  categories: FeedCategory[],
+  categoryTitle: string,
+  updater: (category: FeedCategory) => FeedCategory
+): FeedCategory[] {
+  return categories.map((category) =>
+    category.title === categoryTitle ? updater(category) : category
+  );
+}
+
+export function FeedDisplay({
+  feedId,
+  feed,
+  userId,
+  canReorder,
+  commentCounts,
+  onFeedChange,
+  onCommentCountChange,
+}: FeedDisplayProps) {
+  const itemCount = countItems(feed);
+  const [hiddenCardIds, setHiddenCardIds] = useState<Set<string>>(new Set());
+  const [showHiddenByCategory, setShowHiddenByCategory] = useState<Record<string, boolean>>({});
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPreferences() {
+      setPrefsLoaded(false);
+      setPrefsError(null);
+
+      try {
+        const supabase = createClient();
+        const hidden = await getHiddenCardIds(supabase, feedId, userId);
+
+        const migrated = await migrateLocalPreferencesIfNeeded(
+          supabase,
+          feedId,
+          userId,
+          hidden,
+          []
+        );
+
+        if (!cancelled) {
+          setHiddenCardIds(new Set(migrated.hiddenCardIds));
+        }
+      } catch {
+        if (!cancelled) {
+          setPrefsError("Could not load your saved preferences.");
+        }
+      } finally {
+        if (!cancelled) {
+          setPrefsLoaded(true);
+        }
+      }
+    }
+
+    loadPreferences();
+    return () => {
+      cancelled = true;
+    };
+  }, [feedId, userId]);
+
+  useAutoSaveFeed(feedId, feed, canReorder);
+
+  const handleToggleHideCard = useCallback(
+    async (cardId: string) => {
+      const isHidden = hiddenCardIds.has(cardId);
+      const nextHidden = !isHidden;
+
+      setHiddenCardIds((prev) => {
+        const next = new Set(prev);
+        if (nextHidden) {
+          next.add(cardId);
+        } else {
+          next.delete(cardId);
+        }
+        return next;
+      });
+
+      try {
+        const supabase = createClient();
+        await setCardHidden(supabase, feedId, userId, cardId, nextHidden);
+        setPrefsError(null);
+      } catch {
+        setHiddenCardIds((prev) => {
+          const next = new Set(prev);
+          if (isHidden) {
+            next.add(cardId);
+          } else {
+            next.delete(cardId);
+          }
+          return next;
+        });
+        setPrefsError("Could not save card visibility.");
+      }
+    },
+    [feedId, userId, hiddenCardIds]
+  );
+
+  const handleToggleShowHidden = useCallback((categoryTitle: string) => {
+    setShowHiddenByCategory((prev) => ({
+      ...prev,
+      [categoryTitle]: !prev[categoryTitle],
+    }));
+  }, []);
+
+  const handleReorderItems = (categoryTitle: string, items: FeedItem[]) => {
+    onFeedChange({
+      ...feed,
+      categories: updateCategory(feed.categories, categoryTitle, (category) => ({
+        ...category,
+        items,
+      })),
+    });
+  };
+
+  const handleReorderSubsectionItems = (
+    categoryTitle: string,
+    subsectionTitle: string,
+    items: FeedItem[]
+  ) => {
+    onFeedChange({
+      ...feed,
+      categories: updateCategory(feed.categories, categoryTitle, (category) => ({
+        ...category,
+        subsections: category.subsections.map((subsection) =>
+          subsection.title === subsectionTitle
+            ? { ...subsection, items }
+            : subsection
+        ),
+      })),
+    });
+  };
+
+  if (!prefsLoaded) {
+    return <p className="comments-loading">Loading feed...</p>;
+  }
+
+  return (
+    <>
+      {prefsError && <div className="error-msg">{prefsError}</div>}
+
+      <header className="feed-header">
+        <div className="feed-header-main">
+          <h2>{feed.title}</h2>
+          {feed.meta.length > 0 && (
+            <div className="feed-meta">
+              {feed.meta.map((line, i) => (
+                <span key={i}>{line}</span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="stats-bar">
+          <div className="stat">
+            <strong>{feed.categories.length}</strong> categories
+          </div>
+          <div className="stat">
+            <strong>{itemCount}</strong> items
+          </div>
+        </div>
+      </header>
+
+      {feed.categories.map((category) => (
+        <CategorySection
+          key={category.title}
+          category={category}
+          feedId={feedId}
+          userId={userId}
+          canReorder={canReorder}
+          commentCounts={commentCounts}
+          hiddenCardIds={hiddenCardIds}
+          showHidden={!!showHiddenByCategory[category.title]}
+          onToggleShowHidden={() => handleToggleShowHidden(category.title)}
+          onToggleHideCard={handleToggleHideCard}
+          onReorderItems={(items) => handleReorderItems(category.title, items)}
+          onReorderSubsectionItems={(subsectionTitle, items) =>
+            handleReorderSubsectionItems(category.title, subsectionTitle, items)
+          }
+          onCommentCountChange={onCommentCountChange}
+        />
+      ))}
+
+      {feed.footer && (
+        <p className="category-note feed-footer">{feed.footer}</p>
+      )}
+    </>
+  );
+}
