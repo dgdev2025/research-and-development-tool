@@ -4,6 +4,8 @@ import { InviteUserForm } from "@/components/InviteUserForm";
 import { SettingsUsers } from "@/components/SettingsUsers";
 import { createClient } from "@/lib/supabase/server";
 import { getAllProfiles, getProfile } from "@/lib/profiles";
+import { getSettingsUsers } from "@/lib/users";
+import { isServiceRoleConfigured } from "@/lib/env";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -18,7 +20,12 @@ export default async function SettingsPage() {
     redirect("/login?message=contributor-access");
   }
 
-  const profiles = await getAllProfiles(supabase);
+  const users = isServiceRoleConfigured()
+    ? await getSettingsUsers(supabase)
+    : (await getAllProfiles(supabase)).map((profile) => ({
+        ...profile,
+        status: "active" as const,
+      }));
 
   return (
     <AppShell>
@@ -31,15 +38,21 @@ export default async function SettingsPage() {
 
       <div className="settings-info">
         <p>
-          <strong>Admin</strong> — can import feeds, reorder cards, delete feeds, and manage users.
+          <strong>Admin</strong> — can import feeds, reorder cards, delete
+          feeds, and manage users.
         </p>
         <p>
-          <strong>Contributor</strong> — can view shared feed links and comment on cards.
+          <strong>Contributor</strong> — can view shared feed links and comment
+          on cards.
+        </p>
+        <p>
+          Invited users must set a password from the invite link before they
+          can sign in.
         </p>
       </div>
 
       <InviteUserForm />
-      <SettingsUsers initialProfiles={profiles} />
+      <SettingsUsers initialUsers={users} currentUserId={user.id} />
     </AppShell>
   );
 }

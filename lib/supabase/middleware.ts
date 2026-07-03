@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { needsPasswordSetup } from "@/lib/auth";
 import { getSupabaseEnv, isSupabaseConfigured } from "@/lib/env";
 
 const ADMIN_ROUTES = ["/dashboard", "/feeds/new", "/settings"];
@@ -24,8 +25,12 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAuthRoute = pathname === "/login";
   const isAuthCallback = pathname === "/auth/callback";
+  const isSetPasswordRoute = pathname === "/auth/set-password";
   const isPublicRoute =
-    isAuthRoute || isAuthCallback || pathname === "/api/health";
+    isAuthRoute ||
+    isAuthCallback ||
+    isSetPasswordRoute ||
+    pathname === "/api/health";
 
   if (!isSupabaseConfigured()) {
     if (isPublicRoute) {
@@ -72,9 +77,28 @@ export async function updateSession(request: NextRequest) {
 
   if (user) {
     const role = await getUserRole(supabase, user.id);
+    const mustSetPassword = needsPasswordSetup(user);
     const isAdminRoute = ADMIN_ROUTES.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`)
     );
+
+    if (mustSetPassword && !isSetPasswordRoute && !isAuthCallback) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/auth/set-password";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+
+    if (!mustSetPassword && isSetPasswordRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = role === "admin" ? "/dashboard" : "/login";
+      if (role !== "admin") {
+        url.searchParams.set("message", "contributor-access");
+      } else {
+        url.search = "";
+      }
+      return NextResponse.redirect(url);
+    }
 
     if (isAdminRoute && role !== "admin") {
       const url = request.nextUrl.clone();

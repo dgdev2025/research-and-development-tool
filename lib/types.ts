@@ -2,6 +2,8 @@ import type { ParsedFeed } from "./parseFeed";
 
 export type UserRole = "admin" | "contributor";
 
+export type UserAccountStatus = "active" | "pending" | "needs_password";
+
 export interface Profile {
   id: string;
   email: string;
@@ -9,6 +11,10 @@ export interface Profile {
   role: UserRole;
   created_at: string;
   updated_at: string;
+}
+
+export interface SettingsUserRow extends Profile {
+  status: UserAccountStatus;
 }
 
 export interface FeedRow {

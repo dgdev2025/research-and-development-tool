@@ -45,7 +45,7 @@ export function InviteUserForm() {
     <div className="invite-form-card">
       <h2>Invite user</h2>
       <p className="invite-form-hint">
-        Sends a Supabase email invite. The user sets their password from the link.
+        Sends a Supabase email invite. The user sets their password from the link before signing in.
       </p>
 
       {error && <div className="error-msg">{error}</div>}
