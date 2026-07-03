@@ -637,18 +637,33 @@ export function CardCommentPanel() {
 
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COMMENTS);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const commentsListRef = useRef<HTMLDivElement>(null);
 
-  const commentsNewestFirst = useMemo(
-    () =>
-      [...comments].sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      ),
-    [comments]
-  );
+  const displayedComments = useMemo(() => {
+    if (comments.length <= visibleCount) return comments;
+    return comments.slice(-visibleCount);
+  }, [comments, visibleCount]);
 
-  const displayedComments = commentsNewestFirst.slice(0, visibleCount);
-  const hiddenCount = Math.max(commentsNewestFirst.length - visibleCount, 0);
+  const hiddenCount = Math.max(comments.length - visibleCount, 0);
+
+  const handleLoadMore = () => {
+    const list = commentsListRef.current;
+    const distanceFromBottom = list ? list.scrollHeight - list.scrollTop : 0;
+
+    setVisibleCount((count) => count + LOAD_MORE_COMMENTS);
+
+    requestAnimationFrame(() => {
+      if (list) {
+        list.scrollTop = list.scrollHeight - distanceFromBottom;
+      }
+    });
+  };
+
+  useEffect(() => {
+    const list = commentsListRef.current;
+    if (!list || loading) return;
+    list.scrollTop = list.scrollHeight;
+  }, [comments, loading]);
 
   const adjustTextareaHeight = useCallback(() => {
     const textarea = textareaRef.current;
@@ -677,35 +692,35 @@ export function CardCommentPanel() {
       ) : comments.length === 0 ? (
         <p className="comments-empty">No comments yet. Be the first to comment.</p>
       ) : (
-        <div className="comments-list">
-          {displayedComments.map((comment) => {
-            const imageIndexes = imageIndexRangesByCommentId.get(comment.id) ?? [];
-            const parentComment = comment.parent_comment_id
-              ? commentsById.get(comment.parent_comment_id)
-              : null;
+        <>
+          {!loading && hiddenCount > 0 && (
+            <button
+              type="button"
+              className="comments-load-more"
+              onClick={handleLoadMore}
+            >
+              View more comments ({hiddenCount} older)
+            </button>
+          )}
 
-            return (
-              <CommentBubble
-                key={comment.id}
-                comment={comment}
-                parentComment={parentComment}
-                imageIndexes={imageIndexes}
-              />
-            );
-          })}
-        </div>
-      )}
+          <div className="comments-list" ref={commentsListRef}>
+            {displayedComments.map((comment) => {
+              const imageIndexes = imageIndexRangesByCommentId.get(comment.id) ?? [];
+              const parentComment = comment.parent_comment_id
+                ? commentsById.get(comment.parent_comment_id)
+                : null;
 
-      {!loading && hiddenCount > 0 && (
-        <button
-          type="button"
-          className="comments-load-more"
-          onClick={() =>
-            setVisibleCount((count) => count + LOAD_MORE_COMMENTS)
-          }
-        >
-          View more comments ({hiddenCount} older)
-        </button>
+              return (
+                <CommentBubble
+                  key={comment.id}
+                  comment={comment}
+                  parentComment={parentComment}
+                  imageIndexes={imageIndexes}
+                />
+              );
+            })}
+          </div>
+        </>
       )}
 
       <form onSubmit={handleSubmit} className="comment-form-inline">

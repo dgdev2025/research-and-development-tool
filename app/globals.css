@@ -574,6 +574,7 @@ button {
   font-weight: 600;
   padding: 0.55rem 0.85rem;
   cursor: pointer;
+  margin-bottom: 0.5rem;
   transition:
     background 0.2s,
     border-color 0.2s;
