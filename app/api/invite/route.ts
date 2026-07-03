@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getSiteUrl, isServiceRoleConfigured } from "@/lib/env";
+import { getInviteRedirectUrl, isServiceRoleConfigured } from "@/lib/env";
 import { requireAdmin, getAdminClient } from "@/lib/adminAuth";
+import { markPasswordSetupRequired } from "@/lib/authAdmin";
 import type { UserRole } from "@/lib/types";
 
 interface InviteBody {
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
     }
 
     const admin = getAdminClient();
-    const siteUrl = getSiteUrl(request);
+    const redirectTo = getInviteRedirectUrl(request);
 
     const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
       data: {
@@ -39,16 +40,21 @@ export async function POST(request: Request) {
         role,
         needs_password_setup: true,
       },
-      redirectTo: `${siteUrl}/auth/callback?next=/auth/set-password`,
+      redirectTo,
     });
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    if (data.user?.id) {
+      await markPasswordSetupRequired(data.user.id);
+    }
+
     return NextResponse.json({
       ok: true,
       email: data.user?.email ?? email,
+      redirectTo,
     });
   } catch (error) {
     const message =

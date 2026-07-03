@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { getSiteUrl } from "@/lib/env";
 import { isInviteAuthType } from "@/lib/auth";
@@ -6,35 +7,31 @@ import { markPasswordSetupRequired } from "@/lib/authAdmin";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get("code");
-  const type = requestUrl.searchParams.get("type");
-  const next = requestUrl.searchParams.get("next");
   const siteUrl = getSiteUrl(request);
+  const tokenHash = requestUrl.searchParams.get("token_hash");
+  const type = requestUrl.searchParams.get("type");
+  const next = requestUrl.searchParams.get("next") ?? "/auth/set-password";
 
-  if (!code) {
+  if (!tokenHash || !type) {
     return NextResponse.redirect(`${siteUrl}/login?error=auth`);
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data, error } = await supabase.auth.verifyOtp({
+    token_hash: tokenHash,
+    type: type as EmailOtpType,
+  });
 
   if (error || !data.user) {
     return NextResponse.redirect(`${siteUrl}/login?error=auth`);
   }
 
-  const mustSetPassword =
-    isInviteAuthType(type) ||
-    next === "/auth/set-password" ||
-    data.user.app_metadata?.require_password_setup === true ||
-    data.user.user_metadata?.needs_password_setup === true;
-
-  if (mustSetPassword) {
+  if (isInviteAuthType(type)) {
     await markPasswordSetupRequired(data.user.id);
-    return NextResponse.redirect(`${siteUrl}/auth/set-password`);
   }
 
   const safeNext =
-    next && next.startsWith("/") && !next.startsWith("//") ? next : "/login";
+    next.startsWith("/") && !next.startsWith("//") ? next : "/auth/set-password";
 
   return NextResponse.redirect(`${siteUrl}${safeNext}`);
 }

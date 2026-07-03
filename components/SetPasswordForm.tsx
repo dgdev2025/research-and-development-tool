@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { PageLoader } from "@/components/PageLoader";
 import { AppLogo } from "@/components/AppLogo";
@@ -31,29 +30,20 @@ export function SetPasswordForm() {
     setError(null);
 
     try {
-      const supabase = createClient();
-      const { error: updateError } = await supabase.auth.updateUser({
-        password,
-        data: { needs_password_setup: false },
+      const res = await fetch("/api/auth/set-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
       });
 
-      if (updateError) {
-        setError(updateError.message);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to set password.");
         setLoading(false);
         return;
       }
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user?.id ?? "")
-        .single();
-
-      if (profileData?.role === "admin") {
+      if (data.role === "admin") {
         router.push("/dashboard");
       } else {
         router.replace("/login?message=contributor-access");
@@ -68,6 +58,7 @@ export function SetPasswordForm() {
   };
 
   const handleSignOut = async () => {
+    const { createClient } = await import("@/lib/supabase/client");
     const supabase = createClient();
     await supabase.auth.signOut();
     router.replace("/login");

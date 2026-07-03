@@ -7,36 +7,72 @@ export function getSupabaseEnv() {
   };
 }
 
+function normalizeSiteUrl(url: string): string {
+  return url.replace(/\/$/, "");
+}
+
+function isLocalhostUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return url.includes("localhost") || url.includes("127.0.0.1");
+  }
+}
+
+/** Production-safe URL for auth emails and redirects (never localhost on Vercel). */
+export function getPublicSiteUrl(request?: Request): string {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (configured && !isLocalhostUrl(configured)) {
+    return normalizeSiteUrl(configured);
+  }
+
+  const productionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (productionUrl) {
+    const host = productionUrl.replace(/^https?:\/\//, "");
+    return normalizeSiteUrl(`https://${host}`);
+  }
+
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl && !isLocalhostUrl(vercelUrl)) {
+    return normalizeSiteUrl(`https://${vercelUrl.replace(/^https?:\/\//, "")}`);
+  }
+
+  if (request) {
+    const forwardedHost = request.headers.get("x-forwarded-host");
+    const forwardedProto = request.headers.get("x-forwarded-proto") ?? "https";
+    if (forwardedHost && !forwardedHost.includes("localhost")) {
+      return normalizeSiteUrl(`${forwardedProto}://${forwardedHost}`);
+    }
+  }
+
+  return normalizeSiteUrl(configured || "http://localhost:3000");
+}
+
 export function getSiteUrl(request?: Request): string {
   if (request) {
     const forwardedHost = request.headers.get("x-forwarded-host");
     const forwardedProto = request.headers.get("x-forwarded-proto") ?? "https";
     if (forwardedHost) {
-      return `${forwardedProto}://${forwardedHost}`.replace(/\/$/, "");
+      return normalizeSiteUrl(`${forwardedProto}://${forwardedHost}`);
     }
 
     const origin = new URL(request.url).origin;
     if (origin) {
-      return origin.replace(/\/$/, "");
+      return normalizeSiteUrl(origin);
     }
   }
 
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (configured && !configured.includes("localhost")) {
-    return configured.replace(/\/$/, "");
-  }
+  return getPublicSiteUrl(request);
+}
 
-  const productionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (productionUrl) {
-    return `https://${productionUrl.replace(/\/$/, "")}`;
-  }
-
-  const vercelUrl = process.env.VERCEL_URL?.trim();
-  if (vercelUrl) {
-    return `https://${vercelUrl.replace(/\/$/, "")}`;
-  }
-
-  return (configured || "http://localhost:3000").replace(/\/$/, "");
+export function getInviteRedirectUrl(request?: Request): string {
+  const siteUrl = getPublicSiteUrl(request);
+  const params = new URLSearchParams({
+    type: "invite",
+    next: "/auth/set-password",
+  });
+  return `${siteUrl}/auth/callback?${params.toString()}`;
 }
 
 export function isSupabaseConfigured(): boolean {

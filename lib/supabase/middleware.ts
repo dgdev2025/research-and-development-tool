@@ -25,12 +25,48 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAuthRoute = pathname === "/login";
   const isAuthCallback = pathname === "/auth/callback";
+  const isAuthConfirm = pathname === "/auth/confirm";
   const isSetPasswordRoute = pathname === "/auth/set-password";
   const isPublicRoute =
     isAuthRoute ||
     isAuthCallback ||
+    isAuthConfirm ||
     isSetPasswordRoute ||
     pathname === "/api/health";
+
+  const authCode = request.nextUrl.searchParams.get("code");
+  const tokenHash = request.nextUrl.searchParams.get("token_hash");
+  const authType = request.nextUrl.searchParams.get("type");
+
+  if (
+    authCode &&
+    pathname !== "/auth/callback" &&
+    !pathname.startsWith("/api/")
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    if (!url.searchParams.has("next")) {
+      url.searchParams.set("next", "/auth/set-password");
+    }
+    if (!url.searchParams.has("type")) {
+      url.searchParams.set("type", authType ?? "invite");
+    }
+    return NextResponse.redirect(url);
+  }
+
+  if (
+    tokenHash &&
+    authType &&
+    pathname !== "/auth/confirm" &&
+    !pathname.startsWith("/api/")
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/confirm";
+    if (!url.searchParams.has("next")) {
+      url.searchParams.set("next", "/auth/set-password");
+    }
+    return NextResponse.redirect(url);
+  }
 
   if (!isSupabaseConfigured()) {
     if (isPublicRoute) {
@@ -82,7 +118,7 @@ export async function updateSession(request: NextRequest) {
       (route) => pathname === route || pathname.startsWith(`${route}/`)
     );
 
-    if (mustSetPassword && !isSetPasswordRoute && !isAuthCallback) {
+    if (mustSetPassword && !isSetPasswordRoute && !isAuthCallback && !isAuthConfirm) {
       const url = request.nextUrl.clone();
       url.pathname = "/auth/set-password";
       url.search = "";

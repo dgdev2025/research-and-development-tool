@@ -47,7 +47,7 @@ export default async function SettingsPage() {
         </p>
         <p>
           Invited users must set a password from the invite link before they
-          can sign in.
+          can sign in. Re-send invites after changing production URL settings.
         </p>
       </div>
 

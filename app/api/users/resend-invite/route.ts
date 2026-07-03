@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getProfile } from "@/lib/profiles";
-import { getSiteUrl } from "@/lib/env";
+import { getInviteRedirectUrl } from "@/lib/env";
 import { requireAdmin, getAdminClient } from "@/lib/adminAuth";
+import { markPasswordSetupRequired } from "@/lib/authAdmin";
 
 interface ResendBody {
   userId?: string;
@@ -38,8 +39,7 @@ export async function POST(request: Request) {
     }
 
     const profile = await getProfile(auth.supabase, userId);
-    const siteUrl = getSiteUrl(request);
-    const redirectTo = `${siteUrl}/auth/callback?next=/auth/set-password`;
+    const redirectTo = getInviteRedirectUrl(request);
     const metadata = {
       full_name:
         profile?.full_name ??
@@ -49,6 +49,7 @@ export async function POST(request: Request) {
       needs_password_setup: true,
     };
 
+    await markPasswordSetupRequired(userId);
     await admin.auth.admin.updateUserById(userId, {
       user_metadata: {
         ...authUser.user_metadata,
@@ -70,6 +71,7 @@ export async function POST(request: Request) {
         ok: true,
         email,
         message: "Password setup email sent.",
+        redirectTo,
       });
     }
 
@@ -89,6 +91,7 @@ export async function POST(request: Request) {
       ok: true,
       email,
       message: "Invitation resent.",
+      redirectTo,
     });
   } catch (error) {
     const message =
