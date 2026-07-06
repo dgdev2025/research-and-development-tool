@@ -211,14 +211,58 @@ button {
   margin-bottom: 1.5rem;
 }
 
+.feed-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
 .feed-note-label {
   display: block;
-  margin-bottom: 0.45rem;
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-muted);
+}
+
+.feed-save-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.feed-save-indicator--idle,
+.feed-save-indicator--saved {
+  color: #15803d;
+}
+
+.feed-save-indicator--saving {
+  color: var(--text-muted);
+}
+
+.feed-save-indicator--error {
+  color: #b91c1c;
+}
+
+.feed-save-spinner {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid color-mix(in srgb, var(--text-muted) 25%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: feed-save-spin 0.7s linear infinite;
+}
+
+@keyframes feed-save-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .feed-note-input,

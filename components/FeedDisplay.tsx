@@ -182,7 +182,7 @@ export function FeedDisplay({
     prefsLoaded,
   ]);
 
-  useAutoSaveFeed(feedId, feed, canReorder);
+  const feedSaveStatus = useAutoSaveFeed(feedId, feed, canReorder);
 
   const checkBackCardIds = useMemo(
     () => new Set(checkBacks.map((row) => row.card_id)),
@@ -421,6 +421,7 @@ export function FeedDisplay({
       <FeedNote
         note={feed.note}
         canEdit={canReorder}
+        saveStatus={feedSaveStatus}
         onChange={handleNoteChange}
       />
 
