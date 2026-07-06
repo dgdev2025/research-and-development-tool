@@ -9,7 +9,13 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { FeedItem } from "@/lib/parseFeed";
+import { isContainerId } from "@/lib/feedDragDrop";
 import { ItemCard } from "./ItemCard";
+import { useFeedDrag } from "./FeedDragContext";
+
+function CardDropPlaceholder() {
+  return <div className="card-drop-placeholder" aria-hidden="true" />;
+}
 
 interface SortableCardListProps {
   items: FeedItem[];
@@ -145,10 +151,12 @@ function StaticCardList({
 function DroppableCardList({
   containerId,
   isEmpty,
+  showEndPlaceholder,
   children,
 }: {
   containerId: string;
   isEmpty: boolean;
+  showEndPlaceholder: boolean;
   children: ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: containerId });
@@ -161,7 +169,8 @@ function DroppableCardList({
       }`}
     >
       {children}
-      {isEmpty && (
+      {showEndPlaceholder && <CardDropPlaceholder />}
+      {isEmpty && !showEndPlaceholder && (
         <p className="cards-list-empty-hint" aria-hidden="true">
           Drop cards here
         </p>
@@ -171,8 +180,17 @@ function DroppableCardList({
 }
 
 export function EmptyDroppableCardList({ containerId }: { containerId: string }) {
+  const { activeId, overId } = useFeedDrag();
+  const showEndPlaceholder = Boolean(
+    activeId && overId === containerId && isContainerId(overId)
+  );
+
   return (
-    <DroppableCardList containerId={containerId} isEmpty>
+    <DroppableCardList
+      containerId={containerId}
+      isEmpty
+      showEndPlaceholder={showEndPlaceholder}
+    >
       {null}
     </DroppableCardList>
   );
@@ -191,6 +209,27 @@ export function SortableCardList({
   onCheckBackCard,
   onCommentCountChange,
 }: SortableCardListProps) {
+  const { activeId, overId } = useFeedDrag();
+  const activeInThisList = Boolean(activeId && items.some((item) => item.id === activeId));
+  const showEndPlaceholder = Boolean(
+    activeId &&
+      overId === containerId &&
+      isContainerId(overId) &&
+      !activeInThisList
+  );
+
+  const shouldShowPlaceholderBefore = (itemId: string) => {
+    if (!activeId || !overId || overId !== itemId || activeId === itemId) {
+      return false;
+    }
+
+    if (activeInThisList) {
+      return false;
+    }
+
+    return true;
+  };
+
   if (!dragEnabled || !canReorder) {
     return (
       <StaticCardList
@@ -208,20 +247,26 @@ export function SortableCardList({
 
   return (
     <SortableContext items={items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
-      <DroppableCardList containerId={containerId} isEmpty={items.length === 0}>
+      <DroppableCardList
+        containerId={containerId}
+        isEmpty={items.length === 0}
+        showEndPlaceholder={showEndPlaceholder}
+      >
         {items.map((item) => (
-          <SortableCard
-            key={item.id}
-            item={item}
-            feedId={feedId}
-            userId={userId}
-            canReorder={canReorder}
-            commentCount={commentCounts[item.id] ?? 0}
-            isHidden={hiddenCardIds.has(item.id)}
-            onToggleHideCard={onToggleHideCard}
-            onCheckBackCard={onCheckBackCard}
-            onCommentCountChange={onCommentCountChange}
-          />
+          <div key={item.id} className="sortable-card-slot">
+            {shouldShowPlaceholderBefore(item.id) && <CardDropPlaceholder />}
+            <SortableCard
+              item={item}
+              feedId={feedId}
+              userId={userId}
+              canReorder={canReorder}
+              commentCount={commentCounts[item.id] ?? 0}
+              isHidden={hiddenCardIds.has(item.id)}
+              onToggleHideCard={onToggleHideCard}
+              onCheckBackCard={onCheckBackCard}
+              onCommentCountChange={onCommentCountChange}
+            />
+          </div>
         ))}
       </DroppableCardList>
     </SortableContext>

@@ -314,6 +314,12 @@ button {
   color: var(--accent);
 }
 
+.sortable-card-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .sortable-card {
   display: flex;
   align-items: stretch;
@@ -321,13 +327,41 @@ button {
 }
 
 .sortable-card.dragging {
-  opacity: 0.85;
-  z-index: 10;
+  position: relative;
+  z-index: 1;
 }
 
-.sortable-card.dragging .item-card {
+.sortable-card.dragging .item-card,
+.sortable-card.dragging .drag-handle {
+  visibility: hidden;
+}
+
+.sortable-card.dragging::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px dashed color-mix(in srgb, var(--accent) 50%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--bg));
+  pointer-events: none;
+}
+
+.drag-overlay-card {
+  width: min(42rem, calc(100vw - 2rem));
+  cursor: grabbing;
+}
+
+.drag-overlay-card .item-card {
   border-color: var(--accent);
-  box-shadow: 0 8px 24px rgba(20, 51, 190, 0.18);
+  box-shadow: 0 16px 40px rgba(20, 51, 190, 0.24);
+}
+
+.card-drop-placeholder {
+  min-height: 4.25rem;
+  border: 2px dashed var(--accent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-soft) 80%, white);
+  box-shadow: inset 0 0 0 1px rgba(20, 51, 190, 0.08);
 }
 
 .drag-handle {
