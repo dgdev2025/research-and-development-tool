@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { FeedItem } from "@/lib/parseFeed";
 import {
   CardCommentGallery,
@@ -15,8 +14,9 @@ interface ItemCardProps {
   commentCount?: number;
   canReorder?: boolean;
   isHidden?: boolean;
-  defaultOpen?: boolean;
+  isOpen: boolean;
   lockOpen?: boolean;
+  onToggleOpen?: () => void;
   onToggleHide?: () => void;
   onCheckBack?: () => void;
   onCommentAdded?: () => void;
@@ -28,38 +28,14 @@ export function ItemCard({
   userId,
   commentCount = 0,
   isHidden = false,
-  defaultOpen = true,
+  isOpen,
   lockOpen = false,
+  onToggleOpen,
   onToggleHide,
   onCheckBack,
   onCommentAdded,
 }: ItemCardProps) {
-  const [cardOpen, setCardOpen] = useState(defaultOpen);
-  const [hydrated, setHydrated] = useState(false);
-
-  const cardOpenStorageKey = `card-open-${feedId}-${item.id}`;
-
-  useEffect(() => {
-    const stored = localStorage.getItem(cardOpenStorageKey);
-    if (stored !== null) {
-      setCardOpen(stored === "true");
-    }
-    setHydrated(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardOpenStorageKey]);
-
-  useEffect(() => {
-    if (lockOpen) {
-      setCardOpen(true);
-    }
-  }, [lockOpen]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    if (lockOpen) return;
-    localStorage.setItem(cardOpenStorageKey, String(cardOpen));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardOpen, hydrated]);
+  const cardOpen = lockOpen ? true : isOpen;
 
   const commentLabel =
     commentCount > 0
@@ -67,8 +43,8 @@ export function ItemCard({
       : "Comment";
 
   const toggleCardOpen = () => {
-    if (lockOpen) return;
-    setCardOpen((prev) => !prev);
+    if (lockOpen || !onToggleOpen) return;
+    onToggleOpen();
   };
 
   const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLSpanElement>) => {

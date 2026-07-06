@@ -6,6 +6,7 @@ import { findFeedItem } from "@/lib/parseFeed";
 import {
   clearCheckBack,
   getCheckBacksForFeed,
+  getCheckBackStatus,
   setCheckBack,
   sortCheckBacks,
   updateCheckBackDate,
@@ -16,6 +17,14 @@ import {
   migrateLocalPreferencesIfNeeded,
   setCardHidden,
 } from "@/lib/feedPreferences";
+import {
+  getCardOpenStates,
+  getFeedPanelViewState,
+  migrateLocalCardOpenStatesIfNeeded,
+  resolveCardOpen,
+  setCardOpenState,
+  setFeedPanelViewState,
+} from "@/lib/feedViewState";
 import { createClient } from "@/lib/supabase/client";
 import { CategorySection } from "./CategorySection";
 import { CheckBackDatePicker } from "./CheckBackDatePicker";
@@ -40,6 +49,15 @@ function countItems(feed: ParsedFeed): number {
   }, 0);
 }
 
+function getDueCardIdsFromRows(rows: CheckBackRow[]): string[] {
+  return rows
+    .filter((row) => {
+      const status = getCheckBackStatus(row.check_back_until);
+      return status === "overdue" || status === "due_today";
+    })
+    .map((row) => row.card_id);
+}
+
 export function FeedDisplay({
   feedId,
   feed,
@@ -52,11 +70,27 @@ export function FeedDisplay({
   const itemCount = countItems(feed);
   const [hiddenCardIds, setHiddenCardIds] = useState<Set<string>>(new Set());
   const [checkBacks, setCheckBacks] = useState<CheckBackRow[]>([]);
+  const [cardOpenStates, setCardOpenStates] = useState<Record<string, boolean>>({});
+  const [checkBackStripOpen, setCheckBackStripOpen] = useState(false);
+  const [expandedCheckBackCardIds, setExpandedCheckBackCardIds] = useState<Set<string>>(
+    new Set()
+  );
   const [showHiddenByCategory, setShowHiddenByCategory] = useState<Record<string, boolean>>({});
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [prefsError, setPrefsError] = useState<string | null>(null);
   const [checkBackPickerCardId, setCheckBackPickerCardId] = useState<string | null>(
     null
+  );
+
+  const persistPanelViewState = useCallback(
+    async (stripOpen: boolean, expandedIds: string[]) => {
+      const supabase = createClient();
+      await setFeedPanelViewState(supabase, feedId, userId, {
+        checkbackStripOpen: stripOpen,
+        expandedCheckBackCardIds: expandedIds,
+      });
+    },
+    [feedId, userId]
   );
 
   useEffect(() => {
@@ -68,9 +102,11 @@ export function FeedDisplay({
 
       try {
         const supabase = createClient();
-        const [hidden, checkbackRows] = await Promise.all([
+        const [hidden, checkbackRows, openStates, panelState] = await Promise.all([
           getHiddenCardIds(supabase, feedId, userId),
           getCheckBacksForFeed(supabase, feedId, userId),
+          getCardOpenStates(supabase, feedId, userId),
+          getFeedPanelViewState(supabase, feedId, userId),
         ]);
 
         const migrated = await migrateLocalPreferencesIfNeeded(
@@ -80,10 +116,27 @@ export function FeedDisplay({
           hidden,
           []
         );
+        const migratedOpenStates = await migrateLocalCardOpenStatesIfNeeded(
+          supabase,
+          feedId,
+          userId,
+          openStates
+        );
+
+        const dueCardIds = getDueCardIdsFromRows(checkbackRows);
+        const stripOpen =
+          panelState.checkbackStripOpen ?? (dueCardIds.length > 0 ? true : false);
+        const expandedIds = new Set([
+          ...panelState.expandedCheckBackCardIds,
+          ...dueCardIds,
+        ]);
 
         if (!cancelled) {
           setHiddenCardIds(new Set(migrated.hiddenCardIds));
           setCheckBacks(checkbackRows);
+          setCardOpenStates(migratedOpenStates);
+          setCheckBackStripOpen(stripOpen);
+          setExpandedCheckBackCardIds(expandedIds);
         }
       } catch {
         if (!cancelled) {
@@ -101,6 +154,32 @@ export function FeedDisplay({
       cancelled = true;
     };
   }, [feedId, userId]);
+
+  const dueCardIds = useMemo(
+    () => getDueCardIdsFromRows(checkBacks),
+    [checkBacks]
+  );
+
+  useEffect(() => {
+    if (!prefsLoaded || dueCardIds.length === 0) return;
+
+    const missingDue = dueCardIds.filter((cardId) => !expandedCheckBackCardIds.has(cardId));
+    if (missingDue.length === 0 && checkBackStripOpen) return;
+
+    const nextExpanded = new Set([...expandedCheckBackCardIds, ...dueCardIds]);
+    setCheckBackStripOpen(true);
+    setExpandedCheckBackCardIds(nextExpanded);
+
+    persistPanelViewState(true, [...nextExpanded]).catch(() => {
+      setPrefsError("Could not save your view preferences.");
+    });
+  }, [
+    checkBackStripOpen,
+    dueCardIds,
+    expandedCheckBackCardIds,
+    persistPanelViewState,
+    prefsLoaded,
+  ]);
 
   useAutoSaveFeed(feedId, feed, canReorder);
 
@@ -122,6 +201,83 @@ export function FeedDisplay({
   const checkBackPickerItem = checkBackPickerCardId
     ? findFeedItem(feed, checkBackPickerCardId)
     : null;
+
+  const handleToggleCardOpen = useCallback(
+    async (cardId: string, defaultOpen = true) => {
+      const currentOpen = resolveCardOpen(cardOpenStates, cardId, defaultOpen);
+      const nextOpen = !currentOpen;
+
+      setCardOpenStates((prev) => {
+        const next = { ...prev };
+        if (nextOpen === defaultOpen) {
+          delete next[cardId];
+        } else {
+          next[cardId] = nextOpen;
+        }
+        return next;
+      });
+
+      try {
+        const supabase = createClient();
+        await setCardOpenState(
+          supabase,
+          feedId,
+          userId,
+          cardId,
+          nextOpen,
+          defaultOpen
+        );
+        setPrefsError(null);
+      } catch {
+        setCardOpenStates((prev) => {
+          const next = { ...prev };
+          if (currentOpen === defaultOpen) {
+            delete next[cardId];
+          } else {
+            next[cardId] = currentOpen;
+          }
+          return next;
+        });
+        setPrefsError("Could not save card open state.");
+      }
+    },
+    [cardOpenStates, feedId, userId]
+  );
+
+  const handleToggleCheckBackStrip = useCallback(async () => {
+    const nextOpen = !checkBackStripOpen;
+    setCheckBackStripOpen(nextOpen);
+
+    try {
+      await persistPanelViewState(nextOpen, [...expandedCheckBackCardIds]);
+      setPrefsError(null);
+    } catch {
+      setCheckBackStripOpen(!nextOpen);
+      setPrefsError("Could not save check back panel state.");
+    }
+  }, [checkBackStripOpen, expandedCheckBackCardIds, persistPanelViewState]);
+
+  const handleToggleCheckBackEntry = useCallback(
+    async (cardId: string) => {
+      const nextExpanded = new Set(expandedCheckBackCardIds);
+      if (nextExpanded.has(cardId)) {
+        nextExpanded.delete(cardId);
+      } else {
+        nextExpanded.add(cardId);
+      }
+
+      setExpandedCheckBackCardIds(nextExpanded);
+
+      try {
+        await persistPanelViewState(checkBackStripOpen, [...nextExpanded]);
+        setPrefsError(null);
+      } catch {
+        setExpandedCheckBackCardIds(expandedCheckBackCardIds);
+        setPrefsError("Could not save check back entry state.");
+      }
+    },
+    [checkBackStripOpen, expandedCheckBackCardIds, persistPanelViewState]
+  );
 
   const handleToggleHideCard = useCallback(
     async (cardId: string) => {
@@ -256,6 +412,12 @@ export function FeedDisplay({
         feedId={feedId}
         userId={userId}
         commentCounts={commentCounts}
+        cardOpenStates={cardOpenStates}
+        stripOpen={checkBackStripOpen}
+        expandedEntryIds={expandedCheckBackCardIds}
+        onToggleStrip={handleToggleCheckBackStrip}
+        onToggleEntry={handleToggleCheckBackEntry}
+        onToggleCardOpen={handleToggleCardOpen}
         onDone={handleDoneCheckBack}
         onExtend={handleExtendCheckBack}
         onCommentCountChange={onCommentCountChange}
@@ -277,6 +439,8 @@ export function FeedDisplay({
             commentCounts={commentCounts}
             hiddenCardIds={hiddenCardIds}
             checkBackCardIds={checkBackCardIds}
+            cardOpenStates={cardOpenStates}
+            onToggleCardOpen={handleToggleCardOpen}
             showHidden={!!showHiddenByCategory[category.title]}
             onToggleShowHidden={() => handleToggleShowHidden(category.title)}
             onToggleHideCard={handleToggleHideCard}

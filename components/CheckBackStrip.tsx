@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { CheckBackRow, CheckBackStatus } from "@/lib/checkback";
 import {
   formatCheckBackDate,
   getCheckBackStatus,
   getCheckBackStatusPrefix,
 } from "@/lib/checkback";
+import { resolveCardOpen } from "@/lib/feedViewState";
 import type { FeedItemLocation } from "@/lib/parseFeed";
 import { ItemCard } from "./ItemCard";
 import { CheckBackDatePicker } from "./CheckBackDatePicker";
@@ -21,6 +22,12 @@ interface CheckBackStripProps {
   feedId: string;
   userId: string;
   commentCounts: Record<string, number>;
+  cardOpenStates: Record<string, boolean>;
+  stripOpen: boolean;
+  expandedEntryIds: Set<string>;
+  onToggleStrip: () => void;
+  onToggleEntry: (cardId: string) => void;
+  onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
   onDone: (cardId: string) => Promise<void>;
   onExtend: (cardId: string, date: string) => Promise<void>;
   onCommentCountChange: (cardId: string, delta: number) => void;
@@ -63,43 +70,25 @@ export function CheckBackStrip({
   feedId,
   userId,
   commentCounts,
+  cardOpenStates,
+  stripOpen,
+  expandedEntryIds,
+  onToggleStrip,
+  onToggleEntry,
+  onToggleCardOpen,
   onDone,
   onExtend,
   onCommentCountChange,
 }: CheckBackStripProps) {
   const dueCardIds = useMemo(() => getDueCardIds(entries), [entries]);
   const dueCount = dueCardIds.length;
-
-  const [stripOpen, setStripOpen] = useState(() => dueCount > 0);
-  const [expandedEntryIds, setExpandedEntryIds] = useState<Set<string>>(
-    () => new Set(dueCardIds)
-  );
   const [extendCardId, setExtendCardId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (dueCardIds.length === 0) return;
-
-    setStripOpen(true);
-    setExpandedEntryIds((prev) => new Set([...prev, ...dueCardIds]));
-  }, [dueCardIds]);
 
   if (entries.length === 0) return null;
 
   const extendEntry = extendCardId
     ? entries.find((entry) => entry.checkBack.card_id === extendCardId)
     : null;
-
-  const toggleEntry = (cardId: string) => {
-    setExpandedEntryIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(cardId)) {
-        next.delete(cardId);
-      } else {
-        next.add(cardId);
-      }
-      return next;
-    });
-  };
 
   return (
     <section
@@ -109,7 +98,7 @@ export function CheckBackStrip({
       <button
         type="button"
         className="checkback-strip-header-btn"
-        onClick={() => setStripOpen((open) => !open)}
+        onClick={onToggleStrip}
         aria-expanded={stripOpen}
       >
         <svg
@@ -143,7 +132,6 @@ export function CheckBackStrip({
         <div className="checkback-strip-list">
           {entries.map(({ checkBack, location }) => {
             const status = getCheckBackStatus(checkBack.check_back_until);
-            const isDue = isDueStatus(status);
             const isExpanded = expandedEntryIds.has(checkBack.card_id);
             const commentCount = commentCounts[location.item.id] ?? 0;
             const locationLabel = location.subsectionTitle
@@ -161,7 +149,7 @@ export function CheckBackStrip({
                   <button
                     type="button"
                     className="checkback-entry-title"
-                    onClick={() => toggleEntry(checkBack.card_id)}
+                    onClick={() => onToggleEntry(checkBack.card_id)}
                     aria-expanded={isExpanded}
                   >
                     <svg
@@ -231,7 +219,8 @@ export function CheckBackStrip({
                     feedId={feedId}
                     userId={userId}
                     commentCount={commentCount}
-                    defaultOpen
+                    isOpen={resolveCardOpen(cardOpenStates, location.item.id)}
+                    onToggleOpen={() => onToggleCardOpen(location.item.id)}
                     onCommentAdded={() =>
                       onCommentCountChange(location.item.id, 1)
                     }

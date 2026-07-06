@@ -10,6 +10,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import type { FeedItem } from "@/lib/parseFeed";
 import { isContainerId, makeContainerEndId, parseContainerId } from "@/lib/feedDragDrop";
+import { resolveCardOpen } from "@/lib/feedViewState";
 import { ItemCard } from "./ItemCard";
 import { useFeedDrag } from "./FeedDragContext";
 
@@ -42,6 +43,8 @@ interface SortableCardListProps {
   dragEnabled: boolean;
   commentCounts: Record<string, number>;
   hiddenCardIds: Set<string>;
+  cardOpenStates: Record<string, boolean>;
+  onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
   onToggleHideCard: (cardId: string) => void;
   onCheckBackCard?: (cardId: string) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
@@ -54,6 +57,8 @@ function SortableCard({
   canReorder,
   commentCount,
   isHidden,
+  isOpen,
+  onToggleCardOpen,
   onToggleHideCard,
   onCheckBackCard,
   onCommentCountChange,
@@ -64,6 +69,8 @@ function SortableCard({
   canReorder: boolean;
   commentCount: number;
   isHidden: boolean;
+  isOpen: boolean;
+  onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
   onToggleHideCard: (cardId: string) => void;
   onCheckBackCard?: (cardId: string) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
@@ -111,8 +118,9 @@ function SortableCard({
         feedId={feedId}
         userId={userId}
         commentCount={commentCount}
-        canReorder={canReorder}
         isHidden={isHidden}
+        isOpen={isOpen}
+        onToggleOpen={() => onToggleCardOpen(item.id)}
         onToggleHide={() => onToggleHideCard(item.id)}
         onCheckBack={
           onCheckBackCard ? () => onCheckBackCard(item.id) : undefined
@@ -129,6 +137,8 @@ function StaticCardList({
   userId,
   commentCounts,
   hiddenCardIds,
+  cardOpenStates,
+  onToggleCardOpen,
   onToggleHideCard,
   onCheckBackCard,
   onCommentCountChange,
@@ -138,6 +148,8 @@ function StaticCardList({
   userId: string;
   commentCounts: Record<string, number>;
   hiddenCardIds: Set<string>;
+  cardOpenStates: Record<string, boolean>;
+  onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
   onToggleHideCard: (cardId: string) => void;
   onCheckBackCard?: (cardId: string) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
@@ -152,6 +164,8 @@ function StaticCardList({
             userId={userId}
             commentCount={commentCounts[item.id] ?? 0}
             isHidden={hiddenCardIds.has(item.id)}
+            isOpen={resolveCardOpen(cardOpenStates, item.id)}
+            onToggleOpen={() => onToggleCardOpen(item.id)}
             onToggleHide={() => onToggleHideCard(item.id)}
             onCheckBack={
               onCheckBackCard ? () => onCheckBackCard(item.id) : undefined
@@ -235,6 +249,8 @@ export function SortableCardList({
   dragEnabled,
   commentCounts,
   hiddenCardIds,
+  cardOpenStates,
+  onToggleCardOpen,
   onToggleHideCard,
   onCheckBackCard,
   onCommentCountChange,
@@ -273,6 +289,8 @@ export function SortableCardList({
         userId={userId}
         commentCounts={commentCounts}
         hiddenCardIds={hiddenCardIds}
+        cardOpenStates={cardOpenStates}
+        onToggleCardOpen={onToggleCardOpen}
         onToggleHideCard={onToggleHideCard}
         onCheckBackCard={onCheckBackCard}
         onCommentCountChange={onCommentCountChange}
@@ -299,6 +317,8 @@ export function SortableCardList({
               canReorder={canReorder}
               commentCount={commentCounts[item.id] ?? 0}
               isHidden={hiddenCardIds.has(item.id)}
+              isOpen={resolveCardOpen(cardOpenStates, item.id)}
+              onToggleCardOpen={onToggleCardOpen}
               onToggleHideCard={onToggleHideCard}
               onCheckBackCard={onCheckBackCard}
               onCommentCountChange={onCommentCountChange}
