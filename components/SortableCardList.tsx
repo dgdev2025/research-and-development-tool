@@ -9,12 +9,28 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { FeedItem } from "@/lib/parseFeed";
-import { isContainerId } from "@/lib/feedDragDrop";
+import { isContainerId, makeContainerEndId, parseContainerId } from "@/lib/feedDragDrop";
 import { ItemCard } from "./ItemCard";
 import { useFeedDrag } from "./FeedDragContext";
 
 function CardDropPlaceholder() {
   return <div className="card-drop-placeholder" aria-hidden="true" />;
+}
+
+function EndDropZone({ containerEndId }: { containerEndId: string }) {
+  const { overId } = useFeedDrag();
+  const { setNodeRef, isOver } = useDroppable({ id: containerEndId });
+  const isActive = isOver || overId === containerEndId;
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`card-drop-zone-end${isActive ? " is-active" : ""}`}
+      aria-hidden="true"
+    >
+      {isActive && <CardDropPlaceholder />}
+    </div>
+  );
 }
 
 interface SortableCardListProps {
@@ -152,11 +168,15 @@ function DroppableCardList({
   containerId,
   isEmpty,
   showEndPlaceholder,
+  showEndDropZone = false,
+  containerEndId = null,
   children,
 }: {
   containerId: string;
   isEmpty: boolean;
   showEndPlaceholder: boolean;
+  showEndDropZone?: boolean;
+  containerEndId?: string | null;
   children: ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: containerId });
@@ -170,6 +190,9 @@ function DroppableCardList({
     >
       {children}
       {showEndPlaceholder && <CardDropPlaceholder />}
+      {showEndDropZone && containerEndId && (
+        <EndDropZone containerEndId={containerEndId} />
+      )}
       {isEmpty && !showEndPlaceholder && (
         <p className="cards-list-empty-hint" aria-hidden="true">
           Drop cards here
@@ -181,8 +204,13 @@ function DroppableCardList({
 
 export function EmptyDroppableCardList({ containerId }: { containerId: string }) {
   const { activeId, overId } = useFeedDrag();
+  const containerRef = parseContainerId(containerId);
+  const containerEndId = containerRef ? makeContainerEndId(containerRef) : null;
   const showEndPlaceholder = Boolean(
-    activeId && overId === containerId && isContainerId(overId)
+    activeId &&
+      containerEndId &&
+      overId === containerId &&
+      isContainerId(overId)
   );
 
   return (
@@ -190,6 +218,8 @@ export function EmptyDroppableCardList({ containerId }: { containerId: string })
       containerId={containerId}
       isEmpty
       showEndPlaceholder={showEndPlaceholder}
+      showEndDropZone={Boolean(activeId && containerEndId)}
+      containerEndId={containerEndId}
     >
       {null}
     </DroppableCardList>
@@ -211,12 +241,13 @@ export function SortableCardList({
 }: SortableCardListProps) {
   const { activeId, overId } = useFeedDrag();
   const activeInThisList = Boolean(activeId && items.some((item) => item.id === activeId));
+  const containerRef = parseContainerId(containerId);
+  const containerEndId = containerRef ? makeContainerEndId(containerRef) : null;
+  const lastItemId = items[items.length - 1]?.id;
   const showEndPlaceholder = Boolean(
-    activeId &&
-      overId === containerId &&
-      isContainerId(overId) &&
-      !activeInThisList
+    activeId && !activeInThisList && lastItemId && overId === lastItemId
   );
+  const showEndDropZone = Boolean(activeId && !activeInThisList && containerEndId);
 
   const shouldShowPlaceholderBefore = (itemId: string) => {
     if (!activeId || !overId || overId !== itemId || activeId === itemId) {
@@ -224,6 +255,10 @@ export function SortableCardList({
     }
 
     if (activeInThisList) {
+      return false;
+    }
+
+    if (itemId === lastItemId) {
       return false;
     }
 
@@ -251,6 +286,8 @@ export function SortableCardList({
         containerId={containerId}
         isEmpty={items.length === 0}
         showEndPlaceholder={showEndPlaceholder}
+        showEndDropZone={showEndDropZone}
+        containerEndId={containerEndId}
       >
         {items.map((item) => (
           <div key={item.id} className="sortable-card-slot">

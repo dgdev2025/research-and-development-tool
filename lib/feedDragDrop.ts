@@ -29,8 +29,23 @@ export function parseContainerId(id: string): FeedContainerRef | null {
   };
 }
 
+const CONTAINER_END_SUFFIX = "\u001eend";
+
 export function isContainerId(id: string): boolean {
-  return id.startsWith(CONTAINER_PREFIX);
+  return id.startsWith(CONTAINER_PREFIX) && !id.endsWith(CONTAINER_END_SUFFIX);
+}
+
+export function makeContainerEndId(ref: FeedContainerRef): string {
+  return `${makeContainerId(ref)}${CONTAINER_END_SUFFIX}`;
+}
+
+export function isContainerEndId(id: string): boolean {
+  return id.startsWith(CONTAINER_PREFIX) && id.endsWith(CONTAINER_END_SUFFIX);
+}
+
+export function parseContainerEndId(id: string): FeedContainerRef | null {
+  if (!isContainerEndId(id)) return null;
+  return parseContainerId(id.slice(0, -CONTAINER_END_SUFFIX.length));
 }
 
 function sameContainer(a: FeedContainerRef, b: FeedContainerRef): boolean {
@@ -129,7 +144,15 @@ export function moveCardInFeed(
   let target: FeedContainerRef;
   let targetIndex: number;
 
-  if (isContainerId(overId)) {
+  if (isContainerEndId(overId)) {
+    const parsed = parseContainerEndId(overId);
+    if (!parsed) return null;
+
+    target = parsed;
+    const category = feed.categories.find((cat) => cat.title === target.categoryTitle);
+    if (!category) return null;
+    targetIndex = getContainerItems(category, target).length;
+  } else if (isContainerId(overId)) {
     const parsed = parseContainerId(overId);
     if (!parsed) return null;
 
@@ -152,6 +175,10 @@ export function moveCardInFeed(
     const items = getContainerItems(category, target);
     targetIndex = items.findIndex((item) => item.id === overId);
     if (targetIndex === -1) return null;
+
+    if (!sameContainer(source, target) && targetIndex === items.length - 1) {
+      targetIndex = items.length;
+    }
   }
 
   if (sameContainer(source, target)) {
