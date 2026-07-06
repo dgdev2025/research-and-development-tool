@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CheckBackRow, CheckBackStatus } from "@/lib/checkback";
 import {
+  formatCheckBackDate,
   getCheckBackStatus,
-  getCheckBackStatusLabel,
+  getCheckBackStatusPrefix,
 } from "@/lib/checkback";
 import type { FeedItemLocation } from "@/lib/parseFeed";
 import { ItemCard } from "./ItemCard";
@@ -187,7 +188,18 @@ export function CheckBackStrip({
 
                   <div className="checkback-entry-meta">
                     <span className={`checkback-badge checkback-badge--${status}`}>
-                      {getCheckBackStatusLabel(status, checkBack.check_back_until)}
+                      <span className="checkback-badge-label">
+                        {getCheckBackStatusPrefix(status)}
+                      </span>
+                      <span className="checkback-badge-sep" aria-hidden="true">
+                        ·
+                      </span>
+                      <time
+                        className="checkback-badge-date"
+                        dateTime={checkBack.check_back_until}
+                      >
+                        {formatCheckBackDate(checkBack.check_back_until)}
+                      </time>
                     </span>
                     <span className="checkback-entry-category">{locationLabel}</span>
                     {checkBack.note && (

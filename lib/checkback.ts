@@ -33,16 +33,19 @@ export function formatCheckBackDate(until: string): string {
   );
 }
 
-export function getCheckBackStatusLabel(status: CheckBackStatus, until: string): string {
-  const formatted = formatCheckBackDate(until);
+export function getCheckBackStatusPrefix(status: CheckBackStatus): string {
   switch (status) {
     case "overdue":
-      return `Overdue · ${formatted}`;
+      return "Overdue";
     case "due_today":
-      return `Due today · ${formatted}`;
+      return "Due today";
     default:
-      return `Check back · ${formatted}`;
+      return "Scheduled";
   }
+}
+
+export function getCheckBackStatusLabel(status: CheckBackStatus, until: string): string {
+  return `${getCheckBackStatusPrefix(status)} · ${formatCheckBackDate(until)}`;
 }
 
 export function addDaysToDate(days: number): string {
