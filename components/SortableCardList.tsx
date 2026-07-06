@@ -29,6 +29,7 @@ interface SortableCardListProps {
   commentCounts: Record<string, number>;
   hiddenCardIds: Set<string>;
   onToggleHideCard: (cardId: string) => void;
+  onCheckBackCard?: (cardId: string) => void;
   onReorder: (items: FeedItem[]) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
 }
@@ -41,6 +42,7 @@ function SortableCard({
   commentCount,
   isHidden,
   onToggleHideCard,
+  onCheckBackCard,
   onCommentCountChange,
 }: {
   item: FeedItem;
@@ -50,6 +52,7 @@ function SortableCard({
   commentCount: number;
   isHidden: boolean;
   onToggleHideCard: (cardId: string) => void;
+  onCheckBackCard?: (cardId: string) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
 }) {
   const {
@@ -98,6 +101,9 @@ function SortableCard({
         canReorder={canReorder}
         isHidden={isHidden}
         onToggleHide={() => onToggleHideCard(item.id)}
+        onCheckBack={
+          onCheckBackCard ? () => onCheckBackCard(item.id) : undefined
+        }
         onCommentAdded={() => onCommentCountChange(item.id, 1)}
       />
     </div>
@@ -111,6 +117,7 @@ function StaticCardList({
   commentCounts,
   hiddenCardIds,
   onToggleHideCard,
+  onCheckBackCard,
   onCommentCountChange,
 }: {
   items: FeedItem[];
@@ -119,6 +126,7 @@ function StaticCardList({
   commentCounts: Record<string, number>;
   hiddenCardIds: Set<string>;
   onToggleHideCard: (cardId: string) => void;
+  onCheckBackCard?: (cardId: string) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
 }) {
   return (
@@ -132,6 +140,9 @@ function StaticCardList({
             commentCount={commentCounts[item.id] ?? 0}
             isHidden={hiddenCardIds.has(item.id)}
             onToggleHide={() => onToggleHideCard(item.id)}
+            onCheckBack={
+              onCheckBackCard ? () => onCheckBackCard(item.id) : undefined
+            }
             onCommentAdded={() => onCommentCountChange(item.id, 1)}
           />
         </div>
@@ -148,6 +159,7 @@ export function SortableCardList({
   commentCounts,
   hiddenCardIds,
   onToggleHideCard,
+  onCheckBackCard,
   onReorder,
   onCommentCountChange,
 }: SortableCardListProps) {
@@ -184,6 +196,7 @@ export function SortableCardList({
         commentCounts={commentCounts}
         hiddenCardIds={hiddenCardIds}
         onToggleHideCard={onToggleHideCard}
+        onCheckBackCard={onCheckBackCard}
         onCommentCountChange={onCommentCountChange}
       />
     );

@@ -291,3 +291,36 @@ export function parseFeedMarkdown(markdown: string): ParsedFeed {
 
   return { title, meta, categories, footer };
 }
+
+export interface FeedItemLocation {
+  item: FeedItem;
+  categoryTitle: string;
+  subsectionTitle?: string;
+}
+
+export function findFeedItem(
+  feed: ParsedFeed,
+  cardId: string
+): FeedItemLocation | null {
+  for (const category of feed.categories) {
+    for (const item of category.items) {
+      if (item.id === cardId) {
+        return { item, categoryTitle: category.title };
+      }
+    }
+
+    for (const subsection of category.subsections) {
+      for (const item of subsection.items) {
+        if (item.id === cardId) {
+          return {
+            item,
+            categoryTitle: category.title,
+            subsectionTitle: subsection.title,
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}

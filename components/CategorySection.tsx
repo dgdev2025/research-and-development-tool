@@ -10,9 +10,11 @@ interface CategorySectionProps {
   canReorder: boolean;
   commentCounts: Record<string, number>;
   hiddenCardIds: Set<string>;
+  checkBackCardIds: Set<string>;
   showHidden: boolean;
   onToggleShowHidden: () => void;
   onToggleHideCard: (cardId: string) => void;
+  onCheckBackCard: (cardId: string) => void;
   onReorderItems: (items: FeedItem[]) => void;
   onReorderSubsectionItems: (subsectionTitle: string, items: FeedItem[]) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
@@ -21,9 +23,11 @@ interface CategorySectionProps {
 function filterItems(
   items: FeedItem[],
   hiddenCardIds: Set<string>,
+  checkBackCardIds: Set<string>,
   showHidden: boolean
 ) {
   return items.filter((item) => {
+    if (checkBackCardIds.has(item.id)) return false;
     const isHidden = hiddenCardIds.has(item.id);
     if (isHidden) return showHidden;
     return true;
@@ -37,9 +41,11 @@ export function CategorySection({
   canReorder,
   commentCounts,
   hiddenCardIds,
+  checkBackCardIds,
   showHidden,
   onToggleShowHidden,
   onToggleHideCard,
+  onCheckBackCard,
   onReorderItems,
   onReorderSubsectionItems,
   onCommentCountChange,
@@ -50,10 +56,15 @@ export function CategorySection({
   ];
   const hiddenInCategory = categoryCardIds.filter((id) => hiddenCardIds.has(id)).length;
 
-  const visibleItems = filterItems(category.items, hiddenCardIds, showHidden);
+  const visibleItems = filterItems(
+    category.items,
+    hiddenCardIds,
+    checkBackCardIds,
+    showHidden
+  );
   const subsections = category.subsections.map((sub) => ({
     ...sub,
-    items: filterItems(sub.items, hiddenCardIds, showHidden),
+    items: filterItems(sub.items, hiddenCardIds, checkBackCardIds, showHidden),
   }));
 
   const totalVisible =
@@ -84,6 +95,7 @@ export function CategorySection({
           commentCounts={commentCounts}
           hiddenCardIds={hiddenCardIds}
           onToggleHideCard={onToggleHideCard}
+          onCheckBackCard={onCheckBackCard}
           onReorder={onReorderItems}
           onCommentCountChange={onCommentCountChange}
         />
@@ -101,6 +113,7 @@ export function CategorySection({
               commentCounts={commentCounts}
               hiddenCardIds={hiddenCardIds}
               onToggleHideCard={onToggleHideCard}
+              onCheckBackCard={onCheckBackCard}
               onReorder={(items) => onReorderSubsectionItems(sub.title, items)}
               onCommentCountChange={onCommentCountChange}
             />

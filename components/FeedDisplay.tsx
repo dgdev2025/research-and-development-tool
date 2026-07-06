@@ -1,7 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FeedCategory, FeedItem, ParsedFeed } from "@/lib/parseFeed";
+import { findFeedItem } from "@/lib/parseFeed";
+import {
+  clearCheckBack,
+  getCheckBacksForFeed,
+  setCheckBack,
+  sortCheckBacks,
+  updateCheckBackDate,
+  type CheckBackRow,
+} from "@/lib/checkback";
 import {
   getHiddenCardIds,
   migrateLocalPreferencesIfNeeded,
@@ -9,6 +18,8 @@ import {
 } from "@/lib/feedPreferences";
 import { createClient } from "@/lib/supabase/client";
 import { CategorySection } from "./CategorySection";
+import { CheckBackDatePicker } from "./CheckBackDatePicker";
+import { CheckBackStrip } from "./CheckBackStrip";
 import { useAutoSaveFeed } from "@/hooks/useAutoSaveFeed";
 
 interface FeedDisplayProps {
@@ -49,9 +60,13 @@ export function FeedDisplay({
 }: FeedDisplayProps) {
   const itemCount = countItems(feed);
   const [hiddenCardIds, setHiddenCardIds] = useState<Set<string>>(new Set());
+  const [checkBacks, setCheckBacks] = useState<CheckBackRow[]>([]);
   const [showHiddenByCategory, setShowHiddenByCategory] = useState<Record<string, boolean>>({});
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [prefsError, setPrefsError] = useState<string | null>(null);
+  const [checkBackPickerCardId, setCheckBackPickerCardId] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -62,7 +77,10 @@ export function FeedDisplay({
 
       try {
         const supabase = createClient();
-        const hidden = await getHiddenCardIds(supabase, feedId, userId);
+        const [hidden, checkbackRows] = await Promise.all([
+          getHiddenCardIds(supabase, feedId, userId),
+          getCheckBacksForFeed(supabase, feedId, userId),
+        ]);
 
         const migrated = await migrateLocalPreferencesIfNeeded(
           supabase,
@@ -74,6 +92,7 @@ export function FeedDisplay({
 
         if (!cancelled) {
           setHiddenCardIds(new Set(migrated.hiddenCardIds));
+          setCheckBacks(checkbackRows);
         }
       } catch {
         if (!cancelled) {
@@ -93,6 +112,25 @@ export function FeedDisplay({
   }, [feedId, userId]);
 
   useAutoSaveFeed(feedId, feed, canReorder);
+
+  const checkBackCardIds = useMemo(
+    () => new Set(checkBacks.map((row) => row.card_id)),
+    [checkBacks]
+  );
+
+  const checkBackEntries = useMemo(() => {
+    return sortCheckBacks(checkBacks)
+      .map((checkBack) => {
+        const location = findFeedItem(feed, checkBack.card_id);
+        if (!location) return null;
+        return { checkBack, location };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+  }, [checkBacks, feed]);
+
+  const checkBackPickerItem = checkBackPickerCardId
+    ? findFeedItem(feed, checkBackPickerCardId)
+    : null;
 
   const handleToggleHideCard = useCallback(
     async (cardId: string) => {
@@ -127,6 +165,62 @@ export function FeedDisplay({
       }
     },
     [feedId, userId, hiddenCardIds]
+  );
+
+  const handleSetCheckBack = useCallback(
+    async (cardId: string, date: string, note: string) => {
+      try {
+        const supabase = createClient();
+        const row = await setCheckBack(supabase, {
+          feedId,
+          userId,
+          cardId,
+          checkBackUntil: date,
+          note,
+        });
+        setCheckBacks((prev) => {
+          const next = prev.filter((item) => item.card_id !== cardId);
+          return [...next, row];
+        });
+        setCheckBackPickerCardId(null);
+        setPrefsError(null);
+      } catch {
+        setPrefsError("Could not save check back.");
+      }
+    },
+    [feedId, userId]
+  );
+
+  const handleDoneCheckBack = useCallback(
+    async (cardId: string) => {
+      try {
+        const supabase = createClient();
+        await clearCheckBack(supabase, feedId, userId, cardId);
+        setCheckBacks((prev) => prev.filter((row) => row.card_id !== cardId));
+        setPrefsError(null);
+      } catch {
+        setPrefsError("Could not clear check back.");
+      }
+    },
+    [feedId, userId]
+  );
+
+  const handleExtendCheckBack = useCallback(
+    async (cardId: string, date: string) => {
+      try {
+        const supabase = createClient();
+        await updateCheckBackDate(supabase, feedId, userId, cardId, date);
+        setCheckBacks((prev) =>
+          prev.map((row) =>
+            row.card_id === cardId ? { ...row, check_back_until: date } : row
+          )
+        );
+        setPrefsError(null);
+      } catch {
+        setPrefsError("Could not update check back date.");
+      }
+    },
+    [feedId, userId]
   );
 
   const handleToggleShowHidden = useCallback((categoryTitle: string) => {
@@ -194,6 +288,16 @@ export function FeedDisplay({
         </div>
       </header>
 
+      <CheckBackStrip
+        entries={checkBackEntries}
+        feedId={feedId}
+        userId={userId}
+        commentCounts={commentCounts}
+        onDone={handleDoneCheckBack}
+        onExtend={handleExtendCheckBack}
+        onCommentCountChange={onCommentCountChange}
+      />
+
       {feed.categories.map((category) => (
         <CategorySection
           key={category.title}
@@ -203,9 +307,11 @@ export function FeedDisplay({
           canReorder={canReorder}
           commentCounts={commentCounts}
           hiddenCardIds={hiddenCardIds}
+          checkBackCardIds={checkBackCardIds}
           showHidden={!!showHiddenByCategory[category.title]}
           onToggleShowHidden={() => handleToggleShowHidden(category.title)}
           onToggleHideCard={handleToggleHideCard}
+          onCheckBackCard={setCheckBackPickerCardId}
           onReorderItems={(items) => handleReorderItems(category.title, items)}
           onReorderSubsectionItems={(subsectionTitle, items) =>
             handleReorderSubsectionItems(category.title, subsectionTitle, items)
@@ -216,6 +322,16 @@ export function FeedDisplay({
 
       {feed.footer && (
         <p className="category-note feed-footer">{feed.footer}</p>
+      )}
+
+      {checkBackPickerItem && (
+        <CheckBackDatePicker
+          cardTitle={checkBackPickerItem.item.title}
+          onConfirm={(date, note) =>
+            handleSetCheckBack(checkBackPickerItem.item.id, date, note)
+          }
+          onCancel={() => setCheckBackPickerCardId(null)}
+        />
       )}
     </>
   );

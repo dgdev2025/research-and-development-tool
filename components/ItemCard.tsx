@@ -15,7 +15,10 @@ interface ItemCardProps {
   commentCount?: number;
   canReorder?: boolean;
   isHidden?: boolean;
+  defaultOpen?: boolean;
+  lockOpen?: boolean;
   onToggleHide?: () => void;
+  onCheckBack?: () => void;
   onCommentAdded?: () => void;
 }
 
@@ -25,10 +28,13 @@ export function ItemCard({
   userId,
   commentCount = 0,
   isHidden = false,
+  defaultOpen = true,
+  lockOpen = false,
   onToggleHide,
+  onCheckBack,
   onCommentAdded,
 }: ItemCardProps) {
-  const [cardOpen, setCardOpen] = useState(true);
+  const [cardOpen, setCardOpen] = useState(defaultOpen);
   const [hydrated, setHydrated] = useState(false);
 
   const cardOpenStorageKey = `card-open-${feedId}-${item.id}`;
@@ -43,7 +49,14 @@ export function ItemCard({
   }, [cardOpenStorageKey]);
 
   useEffect(() => {
+    if (lockOpen) {
+      setCardOpen(true);
+    }
+  }, [lockOpen]);
+
+  useEffect(() => {
     if (!hydrated) return;
+    if (lockOpen) return;
     localStorage.setItem(cardOpenStorageKey, String(cardOpen));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardOpen, hydrated]);
@@ -53,7 +66,10 @@ export function ItemCard({
       ? `${commentCount} Comment${commentCount === 1 ? "" : "s"}`
       : "Comment";
 
-  const toggleCardOpen = () => setCardOpen((prev) => !prev);
+  const toggleCardOpen = () => {
+    if (lockOpen) return;
+    setCardOpen((prev) => !prev);
+  };
 
   const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLSpanElement>) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -68,12 +84,12 @@ export function ItemCard({
     >
       <div className="item-card-header">
         <span
-          className="item-card-title"
-          role="button"
-          tabIndex={0}
+          className={`item-card-title${lockOpen ? " item-card-title-locked" : ""}`}
+          role={lockOpen ? undefined : "button"}
+          tabIndex={lockOpen ? undefined : 0}
           aria-expanded={cardOpen}
-          onClick={toggleCardOpen}
-          onKeyDown={handleTitleKeyDown}
+          onClick={lockOpen ? undefined : toggleCardOpen}
+          onKeyDown={lockOpen ? undefined : handleTitleKeyDown}
         >
           <svg
             className={`card-chevron${cardOpen ? " open" : ""}`}
@@ -108,6 +124,19 @@ export function ItemCard({
           )}
         </span>
         <div className="item-card-actions">
+          {onCheckBack && (
+            <button
+              type="button"
+              className="checkback-card-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCheckBack();
+              }}
+              aria-label="Check back on this card"
+            >
+              Check back
+            </button>
+          )}
           {onToggleHide &&
             (isHidden ? (
               <button
