@@ -30,6 +30,7 @@ import { CategorySection } from "./CategorySection";
 import { CheckBackDatePicker } from "./CheckBackDatePicker";
 import { CheckBackStrip } from "./CheckBackStrip";
 import { FeedDragDropProvider } from "./FeedDragDropProvider";
+import { FeedNote } from "./FeedNote";
 import { useAutoSaveFeed } from "@/hooks/useAutoSaveFeed";
 
 interface FeedDisplayProps {
@@ -377,6 +378,16 @@ export function FeedDisplay({
     }));
   }, []);
 
+  const handleNoteChange = useCallback(
+    (note: string) => {
+      onFeedChange({
+        ...feed,
+        note: note.trim() ? note : undefined,
+      });
+    },
+    [feed, onFeedChange]
+  );
+
   if (!prefsLoaded) {
     return <p className="comments-loading">Loading feed...</p>;
   }
@@ -406,6 +417,12 @@ export function FeedDisplay({
           </div>
         </div>
       </header>
+
+      <FeedNote
+        note={feed.note}
+        canEdit={canReorder}
+        onChange={handleNoteChange}
+      />
 
       <CheckBackStrip
         entries={checkBackEntries}

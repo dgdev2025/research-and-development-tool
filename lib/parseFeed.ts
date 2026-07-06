@@ -31,6 +31,7 @@ export interface FeedCategory {
 export interface ParsedFeed {
   title: string;
   meta: string[];
+  note?: string;
   categories: FeedCategory[];
   footer?: string;
 }

@@ -33,6 +33,10 @@ export function exportFeedToMarkdown(feed: ParsedFeed): string {
 
   lines.push("", "---", "");
 
+  if (feed.note?.trim()) {
+    lines.push(`> ${feed.note.trim().replace(/\n/g, "\n> ")}`, "");
+  }
+
   feed.categories.forEach((category, index) => {
     lines.push(`## ${category.title}`, "");
 

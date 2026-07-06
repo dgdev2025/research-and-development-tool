@@ -207,6 +207,56 @@ button {
   font-style: italic;
 }
 
+.feed-note {
+  margin-bottom: 1.5rem;
+}
+
+.feed-note-label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.feed-note-input,
+.feed-note-text {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.feed-note-input {
+  min-height: 5.5rem;
+  padding: 0.85rem 1rem;
+  resize: vertical;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.feed-note-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.feed-note-input::placeholder {
+  color: var(--text-muted);
+}
+
+.feed-note-text {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  white-space: pre-wrap;
+}
+
 .category-section {
   margin-bottom: 3rem;
 }
