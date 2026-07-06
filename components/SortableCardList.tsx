@@ -1,19 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
+import type { ReactNode } from "react";
+import { useDroppable } from "@dnd-kit/core";
 import {
   SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -23,14 +13,15 @@ import { ItemCard } from "./ItemCard";
 
 interface SortableCardListProps {
   items: FeedItem[];
+  containerId: string;
   feedId: string;
   userId: string;
   canReorder: boolean;
+  dragEnabled: boolean;
   commentCounts: Record<string, number>;
   hiddenCardIds: Set<string>;
   onToggleHideCard: (cardId: string) => void;
   onCheckBackCard?: (cardId: string) => void;
-  onReorder: (items: FeedItem[]) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
 }
 
@@ -151,43 +142,56 @@ function StaticCardList({
   );
 }
 
+function DroppableCardList({
+  containerId,
+  isEmpty,
+  children,
+}: {
+  containerId: string;
+  isEmpty: boolean;
+  children: ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: containerId });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`cards-list${isEmpty ? " cards-list-empty" : ""}${
+        isOver ? " cards-list-drop-target" : ""
+      }`}
+    >
+      {children}
+      {isEmpty && (
+        <p className="cards-list-empty-hint" aria-hidden="true">
+          Drop cards here
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function EmptyDroppableCardList({ containerId }: { containerId: string }) {
+  return (
+    <DroppableCardList containerId={containerId} isEmpty>
+      {null}
+    </DroppableCardList>
+  );
+}
+
 export function SortableCardList({
   items,
+  containerId,
   feedId,
   userId,
   canReorder,
+  dragEnabled,
   commentCounts,
   hiddenCardIds,
   onToggleHideCard,
   onCheckBackCard,
-  onReorder,
   onCommentCountChange,
 }: SortableCardListProps) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = items.findIndex((item) => item.id === active.id);
-    const newIndex = items.findIndex((item) => item.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    onReorder(arrayMove(items, oldIndex, newIndex));
-  };
-
-  if (!mounted || !canReorder) {
+  if (!dragEnabled || !canReorder) {
     return (
       <StaticCardList
         items={items}
@@ -203,28 +207,23 @@ export function SortableCardList({
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-        <div className="cards-list">
-          {items.map((item) => (
-            <SortableCard
-              key={item.id}
-              item={item}
-              feedId={feedId}
-              userId={userId}
-              canReorder={canReorder}
-              commentCount={commentCounts[item.id] ?? 0}
-              isHidden={hiddenCardIds.has(item.id)}
-              onToggleHideCard={onToggleHideCard}
-              onCommentCountChange={onCommentCountChange}
-            />
-          ))}
-        </div>
-      </SortableContext>
-    </DndContext>
+    <SortableContext items={items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+      <DroppableCardList containerId={containerId} isEmpty={items.length === 0}>
+        {items.map((item) => (
+          <SortableCard
+            key={item.id}
+            item={item}
+            feedId={feedId}
+            userId={userId}
+            canReorder={canReorder}
+            commentCount={commentCounts[item.id] ?? 0}
+            isHidden={hiddenCardIds.has(item.id)}
+            onToggleHideCard={onToggleHideCard}
+            onCheckBackCard={onCheckBackCard}
+            onCommentCountChange={onCommentCountChange}
+          />
+        ))}
+      </DroppableCardList>
+    </SortableContext>
   );
 }

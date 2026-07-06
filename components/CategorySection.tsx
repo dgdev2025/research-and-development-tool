@@ -1,13 +1,15 @@
 "use client";
 
 import type { FeedCategory, FeedItem } from "@/lib/parseFeed";
-import { SortableCardList } from "./SortableCardList";
+import { makeContainerId } from "@/lib/feedDragDrop";
+import { EmptyDroppableCardList, SortableCardList } from "./SortableCardList";
 
 interface CategorySectionProps {
   category: FeedCategory;
   feedId: string;
   userId: string;
   canReorder: boolean;
+  dragEnabled: boolean;
   commentCounts: Record<string, number>;
   hiddenCardIds: Set<string>;
   checkBackCardIds: Set<string>;
@@ -15,8 +17,6 @@ interface CategorySectionProps {
   onToggleShowHidden: () => void;
   onToggleHideCard: (cardId: string) => void;
   onCheckBackCard: (cardId: string) => void;
-  onReorderItems: (items: FeedItem[]) => void;
-  onReorderSubsectionItems: (subsectionTitle: string, items: FeedItem[]) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
 }
 
@@ -39,6 +39,7 @@ export function CategorySection({
   feedId,
   userId,
   canReorder,
+  dragEnabled,
   commentCounts,
   hiddenCardIds,
   checkBackCardIds,
@@ -46,8 +47,6 @@ export function CategorySection({
   onToggleShowHidden,
   onToggleHideCard,
   onCheckBackCard,
-  onReorderItems,
-  onReorderSubsectionItems,
   onCommentCountChange,
 }: CategorySectionProps) {
   const categoryCardIds = [
@@ -62,16 +61,29 @@ export function CategorySection({
     checkBackCardIds,
     showHidden
   );
-  const subsections = category.subsections.map((sub) => ({
-    ...sub,
-    items: filterItems(sub.items, hiddenCardIds, checkBackCardIds, showHidden),
-  }));
 
   const totalVisible =
     visibleItems.length +
-    subsections.reduce((sum, sub) => sum + sub.items.length, 0);
+    category.subsections.reduce(
+      (sum, sub) =>
+        sum +
+        filterItems(sub.items, hiddenCardIds, checkBackCardIds, showHidden).length,
+      0
+    );
 
-  if (totalVisible === 0 && !category.note && hiddenInCategory === 0) return null;
+  const hasCardsInCategory = categoryCardIds.length > 0;
+
+  if (
+    totalVisible === 0 &&
+    !category.note &&
+    hiddenInCategory === 0 &&
+    !hasCardsInCategory &&
+    !canReorder
+  ) {
+    return null;
+  }
+
+  const categoryContainerId = makeContainerId({ categoryTitle: category.title });
 
   return (
     <section className="category-section">
@@ -86,40 +98,63 @@ export function CategorySection({
 
       {category.note && <p className="category-note">{category.note}</p>}
 
-      {visibleItems.length > 0 && (
+      {visibleItems.length > 0 ? (
         <SortableCardList
           items={visibleItems}
+          containerId={categoryContainerId}
           feedId={feedId}
           userId={userId}
           canReorder={canReorder}
+          dragEnabled={dragEnabled}
           commentCounts={commentCounts}
           hiddenCardIds={hiddenCardIds}
           onToggleHideCard={onToggleHideCard}
           onCheckBackCard={onCheckBackCard}
-          onReorder={onReorderItems}
           onCommentCountChange={onCommentCountChange}
         />
-      )}
+      ) : dragEnabled && canReorder ? (
+        <EmptyDroppableCardList containerId={categoryContainerId} />
+      ) : null}
 
-      {subsections.map((sub) =>
-        sub.items.length > 0 ? (
+      {category.subsections.map((sub) => {
+        const visibleSubItems = filterItems(
+          sub.items,
+          hiddenCardIds,
+          checkBackCardIds,
+          showHidden
+        );
+        const subsectionContainerId = makeContainerId({
+          categoryTitle: category.title,
+          subsectionTitle: sub.title,
+        });
+
+        if (visibleSubItems.length === 0 && !(dragEnabled && canReorder)) {
+          return null;
+        }
+
+        return (
           <div key={sub.title} className="subsection">
             <h4 className="subsection-title">{sub.title}</h4>
-            <SortableCardList
-              items={sub.items}
-              feedId={feedId}
-              userId={userId}
-              canReorder={canReorder}
-              commentCounts={commentCounts}
-              hiddenCardIds={hiddenCardIds}
-              onToggleHideCard={onToggleHideCard}
-              onCheckBackCard={onCheckBackCard}
-              onReorder={(items) => onReorderSubsectionItems(sub.title, items)}
-              onCommentCountChange={onCommentCountChange}
-            />
+            {visibleSubItems.length > 0 ? (
+              <SortableCardList
+                items={visibleSubItems}
+                containerId={subsectionContainerId}
+                feedId={feedId}
+                userId={userId}
+                canReorder={canReorder}
+                dragEnabled={dragEnabled}
+                commentCounts={commentCounts}
+                hiddenCardIds={hiddenCardIds}
+                onToggleHideCard={onToggleHideCard}
+                onCheckBackCard={onCheckBackCard}
+                onCommentCountChange={onCommentCountChange}
+              />
+            ) : (
+              <EmptyDroppableCardList containerId={subsectionContainerId} />
+            )}
           </div>
-        ) : null
-      )}
+        );
+      })}
     </section>
   );
 }

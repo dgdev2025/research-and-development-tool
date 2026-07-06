@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { FeedCategory, FeedItem, ParsedFeed } from "@/lib/parseFeed";
+import type { ParsedFeed } from "@/lib/parseFeed";
 import { findFeedItem } from "@/lib/parseFeed";
 import {
   clearCheckBack,
@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 import { CategorySection } from "./CategorySection";
 import { CheckBackDatePicker } from "./CheckBackDatePicker";
 import { CheckBackStrip } from "./CheckBackStrip";
+import { FeedDragDropProvider } from "./FeedDragDropProvider";
 import { useAutoSaveFeed } from "@/hooks/useAutoSaveFeed";
 
 interface FeedDisplayProps {
@@ -37,16 +38,6 @@ function countItems(feed: ParsedFeed): number {
     const subTotal = cat.subsections.reduce((s, sub) => s + sub.items.length, 0);
     return total + cat.items.length + subTotal;
   }, 0);
-}
-
-function updateCategory(
-  categories: FeedCategory[],
-  categoryTitle: string,
-  updater: (category: FeedCategory) => FeedCategory
-): FeedCategory[] {
-  return categories.map((category) =>
-    category.title === categoryTitle ? updater(category) : category
-  );
 }
 
 export function FeedDisplay({
@@ -230,34 +221,6 @@ export function FeedDisplay({
     }));
   }, []);
 
-  const handleReorderItems = (categoryTitle: string, items: FeedItem[]) => {
-    onFeedChange({
-      ...feed,
-      categories: updateCategory(feed.categories, categoryTitle, (category) => ({
-        ...category,
-        items,
-      })),
-    });
-  };
-
-  const handleReorderSubsectionItems = (
-    categoryTitle: string,
-    subsectionTitle: string,
-    items: FeedItem[]
-  ) => {
-    onFeedChange({
-      ...feed,
-      categories: updateCategory(feed.categories, categoryTitle, (category) => ({
-        ...category,
-        subsections: category.subsections.map((subsection) =>
-          subsection.title === subsectionTitle
-            ? { ...subsection, items }
-            : subsection
-        ),
-      })),
-    });
-  };
-
   if (!prefsLoaded) {
     return <p className="comments-loading">Loading feed...</p>;
   }
@@ -298,27 +261,30 @@ export function FeedDisplay({
         onCommentCountChange={onCommentCountChange}
       />
 
-      {feed.categories.map((category) => (
-        <CategorySection
-          key={category.title}
-          category={category}
-          feedId={feedId}
-          userId={userId}
-          canReorder={canReorder}
-          commentCounts={commentCounts}
-          hiddenCardIds={hiddenCardIds}
-          checkBackCardIds={checkBackCardIds}
-          showHidden={!!showHiddenByCategory[category.title]}
-          onToggleShowHidden={() => handleToggleShowHidden(category.title)}
-          onToggleHideCard={handleToggleHideCard}
-          onCheckBackCard={setCheckBackPickerCardId}
-          onReorderItems={(items) => handleReorderItems(category.title, items)}
-          onReorderSubsectionItems={(subsectionTitle, items) =>
-            handleReorderSubsectionItems(category.title, subsectionTitle, items)
-          }
-          onCommentCountChange={onCommentCountChange}
-        />
-      ))}
+      <FeedDragDropProvider
+        enabled={canReorder}
+        feed={feed}
+        onFeedChange={onFeedChange}
+      >
+        {feed.categories.map((category) => (
+          <CategorySection
+            key={category.title}
+            category={category}
+            feedId={feedId}
+            userId={userId}
+            canReorder={canReorder}
+            dragEnabled={canReorder}
+            commentCounts={commentCounts}
+            hiddenCardIds={hiddenCardIds}
+            checkBackCardIds={checkBackCardIds}
+            showHidden={!!showHiddenByCategory[category.title]}
+            onToggleShowHidden={() => handleToggleShowHidden(category.title)}
+            onToggleHideCard={handleToggleHideCard}
+            onCheckBackCard={setCheckBackPickerCardId}
+            onCommentCountChange={onCommentCountChange}
+          />
+        ))}
+      </FeedDragDropProvider>
 
       {feed.footer && (
         <p className="category-note feed-footer">{feed.footer}</p>

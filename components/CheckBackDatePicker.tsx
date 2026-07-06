@@ -43,7 +43,7 @@ export function CheckBackDatePicker({
         aria-labelledby="checkback-picker-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 id="checkback-picker-title">Check back on</h3>
+        <h3 id="checkback-picker-title">Add to check back</h3>
         <p className="checkback-picker-subtitle">{cardTitle}</p>
 
         <div className="checkback-quick-options">

@@ -132,9 +132,9 @@ export function ItemCard({
                 e.stopPropagation();
                 onCheckBack();
               }}
-              aria-label="Check back on this card"
+              aria-label="Add to check back"
             >
-              Check back
+              Add to check back
             </button>
           )}
           {onToggleHide &&
