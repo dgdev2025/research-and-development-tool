@@ -12,11 +12,16 @@ export interface MentionMatch {
 export interface MentionSuggestion {
   userId: string;
   email: string;
+  handle: string;
   label: string;
 }
 
 export function getMentionLabel(profile: Pick<Profile, "email" | "full_name">): string {
   return profile.full_name?.trim() || profile.email;
+}
+
+export function getMentionHandle(profile: Pick<Profile, "email">): string {
+  return profile.email.split("@")[0]?.trim().toLowerCase() || profile.email.toLowerCase();
 }
 
 export function extractMentionQuery(text: string, caretIndex: number): string | null {
@@ -41,7 +46,7 @@ export function applyMentionSuggestion(
 
   const prefix = match[1] ?? "";
   const replaceStart = beforeCaret.length - match[0].length;
-  const mentionToken = `${prefix}@${suggestion.email} `;
+  const mentionToken = `${prefix}@${suggestion.handle} `;
   const nextText = `${text.slice(0, replaceStart)}${mentionToken}${afterCaret}`;
   const nextCaretIndex = replaceStart + mentionToken.length;
 
@@ -52,18 +57,23 @@ export function parseMentionMatches(
   body: string,
   profiles: Pick<Profile, "id" | "email" | "full_name">[]
 ): MentionMatch[] {
-  const byEmail = new Map(
-    profiles.map((profile) => [profile.email.toLowerCase(), profile.id])
-  );
+  const byToken = new Map<string, string>();
+  for (const profile of profiles) {
+    byToken.set(profile.email.toLowerCase(), profile.id);
+    const handle = getMentionHandle(profile);
+    if (!byToken.has(handle)) {
+      byToken.set(handle, profile.id);
+    }
+  }
   const matches = new Map<string, MentionMatch>();
 
   for (const match of body.matchAll(MENTION_REGEX)) {
     const token = match[2];
-    const email = match[3]?.trim().toLowerCase();
-    if (!token || !email) continue;
-    const userId = byEmail.get(email);
+    const rawToken = match[3]?.trim().toLowerCase();
+    if (!token || !rawToken) continue;
+    const userId = byToken.get(rawToken);
     if (!userId) continue;
-    matches.set(userId, { token, email, userId });
+    matches.set(userId, { token, email: rawToken, userId });
   }
 
   return [...matches.values()];
@@ -73,9 +83,14 @@ export function renderMentionText(
   body: string,
   profiles: Pick<Profile, "id" | "email" | "full_name">[]
 ): Array<{ text: string; mentionedUserId?: string }> {
-  const byEmail = new Map(
-    profiles.map((profile) => [profile.email.toLowerCase(), profile])
-  );
+  const byToken = new Map<string, Pick<Profile, "id" | "email" | "full_name">>();
+  for (const profile of profiles) {
+    byToken.set(profile.email.toLowerCase(), profile);
+    const handle = getMentionHandle(profile);
+    if (!byToken.has(handle)) {
+      byToken.set(handle, profile);
+    }
+  }
   const parts: Array<{ text: string; mentionedUserId?: string }> = [];
   let lastIndex = 0;
 
@@ -83,7 +98,7 @@ export function renderMentionText(
     const fullMatch = match[0];
     const leading = match[1] ?? "";
     const token = match[2];
-    const email = match[3]?.trim().toLowerCase();
+    const rawToken = match[3]?.trim().toLowerCase();
     const index = match.index ?? 0;
     const tokenStart = index + leading.length;
 
@@ -91,7 +106,7 @@ export function renderMentionText(
       parts.push({ text: body.slice(lastIndex, tokenStart) });
     }
 
-    const profile = email ? byEmail.get(email) : null;
+    const profile = rawToken ? byToken.get(rawToken) : null;
     if (profile && token) {
       parts.push({
         text: `@${getMentionLabel(profile)}`,
@@ -131,6 +146,7 @@ export function filterMentionSuggestions(
     .map((profile) => ({
       userId: profile.id,
       email: profile.email,
+      handle: getMentionHandle(profile),
       label: getMentionLabel(profile),
     }));
 }

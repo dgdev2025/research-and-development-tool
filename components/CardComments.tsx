@@ -455,6 +455,7 @@ function CommentBubble({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const isOwner = comment.user_id === userId;
 
@@ -526,6 +527,15 @@ function CommentBubble({
     () => renderMentionText(comment.body, mentionableProfiles),
     [comment.body, mentionableProfiles]
   );
+  const menuStyle = useMemo(() => {
+    if (!menuOpen || !triggerRef.current) return undefined;
+    const rect = triggerRef.current.getBoundingClientRect();
+    return {
+      position: "fixed" as const,
+      top: rect.bottom + 6,
+      left: Math.max(12, rect.right - 136),
+    };
+  }, [menuOpen]);
 
   return (
     <article id={`comment-${comment.id}`} className="comment-item">
@@ -538,6 +548,7 @@ function CommentBubble({
           </div>
           <div className="comment-menu" ref={menuRef}>
             <button
+              ref={triggerRef}
               type="button"
               className={`comment-menu-trigger${menuOpen ? " open" : ""}`}
               onClick={() => setMenuOpen((open) => !open)}
@@ -552,7 +563,7 @@ function CommentBubble({
               </svg>
             </button>
             {menuOpen && (
-              <div className="comment-menu-dropdown" role="menu">
+              <div className="comment-menu-dropdown" role="menu" style={menuStyle}>
                 <button type="button" className="comment-menu-item" role="menuitem" onClick={handleReply}>
                   Reply
                 </button>
@@ -804,6 +815,10 @@ export function CardCommentPanel() {
     },
     [adjustTextareaHeight, body, setBody]
   );
+  const renderedComposerBody = useMemo(
+    () => renderMentionText(body, mentionableProfiles),
+    [body, mentionableProfiles]
+  );
 
   return (
     <div className="card-comments-panel">
@@ -908,63 +923,78 @@ export function CardCommentPanel() {
               }}
             />
           </label>
-          <textarea
-            ref={textareaRef}
-            value={body}
-            onChange={(e) => {
-              const nextValue = e.target.value;
-              setBody(nextValue);
-              updateMentionSuggestions(nextValue, e.target.selectionStart ?? nextValue.length);
-              adjustTextareaHeight();
-            }}
-            onKeyDown={(e) => {
-              if (mentionSuggestions.length > 0) {
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setActiveMentionIndex((index) =>
-                    Math.min(index + 1, mentionSuggestions.length - 1)
-                  );
-                  return;
+          <div className={`comment-input-text-wrap${body ? " has-content" : ""}`}>
+            {body && (
+              <div className="comment-input-highlight" aria-hidden="true">
+                {renderedComposerBody.map((part, index) =>
+                  part.mentionedUserId ? (
+                    <span key={`${part.mentionedUserId}-${index}`} className="comment-mention">
+                      {part.text}
+                    </span>
+                  ) : (
+                    <span key={index}>{part.text}</span>
+                  )
+                )}
+              </div>
+            )}
+            <textarea
+              ref={textareaRef}
+              value={body}
+              onChange={(e) => {
+                const nextValue = e.target.value;
+                setBody(nextValue);
+                updateMentionSuggestions(nextValue, e.target.selectionStart ?? nextValue.length);
+                adjustTextareaHeight();
+              }}
+              onKeyDown={(e) => {
+                if (mentionSuggestions.length > 0) {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setActiveMentionIndex((index) =>
+                      Math.min(index + 1, mentionSuggestions.length - 1)
+                    );
+                    return;
+                  }
+
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setActiveMentionIndex((index) => Math.max(index - 1, 0));
+                    return;
+                  }
+
+                  if (e.key === "Enter" && e.shiftKey === false) {
+                    e.preventDefault();
+                    selectMentionSuggestion(
+                      mentionSuggestions[activeMentionIndex] ?? mentionSuggestions[0]
+                    );
+                    return;
+                  }
+
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setMentionSuggestions([]);
+                    return;
+                  }
                 }
 
-                if (e.key === "ArrowUp") {
+                if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  setActiveMentionIndex((index) => Math.max(index - 1, 0));
-                  return;
+                  if (!submitting && canSubmit) {
+                    e.currentTarget.form?.requestSubmit();
+                  }
                 }
-
-                if (e.key === "Enter" && e.shiftKey === false) {
-                  e.preventDefault();
-                  selectMentionSuggestion(
-                    mentionSuggestions[activeMentionIndex] ?? mentionSuggestions[0]
-                  );
-                  return;
-                }
-
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  setMentionSuggestions([]);
-                  return;
-                }
+              }}
+              placeholder={
+                isDraggingOver
+                  ? "Drop images to attach..."
+                  : replyingTo
+                    ? `Reply to ${replyingTo.authorEmail}...`
+                    : "Write a comment..."
               }
-
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (!submitting && canSubmit) {
-                  e.currentTarget.form?.requestSubmit();
-                }
-              }
-            }}
-            placeholder={
-              isDraggingOver
-                ? "Drop images to attach..."
-                : replyingTo
-                  ? `Reply to ${replyingTo.authorEmail}...`
-                  : "Write a comment..."
-            }
-            rows={1}
-            className="comment-input-textarea"
-          />
+              rows={1}
+              className="comment-input-textarea"
+            />
+          </div>
           {mentionSuggestions.length > 0 && (
             <div className="mention-suggestions" role="listbox" aria-label="Mention suggestions">
               {mentionSuggestions.map((suggestion, index) => (
@@ -982,7 +1012,7 @@ export function CardCommentPanel() {
                   aria-selected={index === activeMentionIndex}
                 >
                   <span className="mention-suggestion-label">{suggestion.label}</span>
-                  <span className="mention-suggestion-email">@{suggestion.email}</span>
+                  <span className="mention-suggestion-email">@{suggestion.handle}</span>
                 </button>
               ))}
             </div>

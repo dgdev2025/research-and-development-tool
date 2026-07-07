@@ -2290,9 +2290,7 @@ select.invite-field {
 }
 
 .comment-menu-dropdown {
-  position: absolute;
-  top: calc(100% + 0.35rem);
-  right: 0;
+  position: fixed;
   z-index: 20;
   min-width: 8.5rem;
   background: var(--surface);
@@ -2479,6 +2477,23 @@ select.invite-field {
   position: relative;
 }
 
+.comment-input-text-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.comment-input-highlight {
+  position: absolute;
+  inset: 0;
+  padding: 0.4rem 0.25rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+  color: var(--text);
+  pointer-events: none;
+}
+
 .mention-suggestions {
   position: absolute;
   left: 2.75rem;
@@ -2542,6 +2557,13 @@ select.invite-field {
   overflow-y: auto;
   outline: none;
   line-height: 1.4;
+  position: relative;
+  z-index: 1;
+}
+
+.comment-input-text-wrap.has-content .comment-input-textarea {
+  color: transparent;
+  caret-color: var(--text);
 }
 
 .comment-attach-btn {
