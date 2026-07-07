@@ -20,8 +20,22 @@ export function getMentionLabel(profile: Pick<Profile, "email" | "full_name">): 
   return profile.full_name?.trim() || profile.email;
 }
 
-export function getMentionHandle(profile: Pick<Profile, "email">): string {
-  return profile.email.split("@")[0]?.trim().toLowerCase() || profile.email.toLowerCase();
+function normalizeMentionHandle(value: string): string {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "");
+
+  return normalized;
+}
+
+export function getMentionHandle(profile: Pick<Profile, "email" | "full_name">): string {
+  const firstName = profile.full_name?.trim().split(/\s+/)[0];
+  const firstNameHandle = firstName ? normalizeMentionHandle(firstName) : "";
+  if (firstNameHandle) return firstNameHandle;
+
+  const emailHandle = profile.email.split("@")[0] ?? profile.email;
+  return normalizeMentionHandle(emailHandle) || profile.email.toLowerCase();
 }
 
 export function extractMentionQuery(text: string, caretIndex: number): string | null {
@@ -138,6 +152,7 @@ export function filterMentionSuggestions(
     .filter((profile) => {
       if (!normalized) return true;
       return (
+        getMentionHandle(profile).includes(normalized) ||
         profile.email.toLowerCase().includes(normalized) ||
         profile.full_name?.toLowerCase().includes(normalized)
       );
