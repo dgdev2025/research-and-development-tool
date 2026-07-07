@@ -1287,6 +1287,127 @@ button {
   text-decoration: none;
 }
 
+.notification-menu {
+  position: relative;
+}
+
+.notification-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    color 0.2s;
+}
+
+.notification-trigger:hover,
+.notification-trigger.open {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: #dc2626;
+  color: white;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.notification-dropdown {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  width: min(360px, calc(100vw - 2rem));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 70;
+  overflow: hidden;
+}
+
+.notification-header {
+  padding: 0.8rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.notification-list {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.notification-empty {
+  margin: 0;
+  padding: 1rem 0.9rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.notification-item {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  padding: 0.85rem 0.9rem;
+  text-align: left;
+  transition: background 0.2s ease;
+}
+
+.notification-item:hover {
+  background: var(--bg);
+}
+
+.notification-item.unread {
+  background: color-mix(in srgb, var(--accent-soft) 55%, white);
+}
+
+.notification-item-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.3rem;
+  font-size: 0.78rem;
+}
+
+.notification-item-top span {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.notification-item-body {
+  font-size: 0.84rem;
+  color: var(--text);
+  margin-bottom: 0.25rem;
+}
+
+.notification-item-body span {
+  font-weight: 700;
+}
+
+.notification-item-snippet {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
 .user-menu {
   position: relative;
   margin-left: 0.35rem;
@@ -2091,6 +2212,11 @@ select.invite-field {
   gap: 0.75rem;
 }
 
+.comment-item-highlight .comment-content {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+  background: color-mix(in srgb, var(--accent-soft) 45%, var(--bg));
+}
+
 .initial-avatar {
   border-radius: 50%;
   display: inline-flex;
@@ -2113,6 +2239,9 @@ select.invite-field {
   border-radius: 12px;
   padding: 0.75rem 1rem;
   position: relative;
+  transition:
+    background 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .comment-meta {
@@ -2345,6 +2474,56 @@ select.invite-field {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 999px;
+  position: relative;
+}
+
+.mention-suggestions {
+  position: absolute;
+  left: 2.75rem;
+  right: 3rem;
+  bottom: calc(100% + 0.45rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  z-index: 20;
+}
+
+.mention-suggestion {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  color: var(--text);
+}
+
+.mention-suggestion:hover,
+.mention-suggestion.active {
+  background: var(--accent-soft);
+}
+
+.mention-suggestion-label {
+  font-weight: 600;
+}
+
+.mention-suggestion-email {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.comment-mention {
+  display: inline;
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .comment-input-textarea {

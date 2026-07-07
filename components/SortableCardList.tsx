@@ -44,6 +44,7 @@ interface SortableCardListProps {
   commentCounts: Record<string, number>;
   hiddenCardIds: Set<string>;
   cardOpenStates: Record<string, boolean>;
+  forcedOpenCardId?: string | null;
   onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
   onToggleHideCard: (cardId: string) => void;
   onCheckBackCard?: (cardId: string) => void;
@@ -58,6 +59,7 @@ function SortableCard({
   commentCount,
   isHidden,
   isOpen,
+  lockOpen = false,
   onToggleCardOpen,
   onToggleHideCard,
   onCheckBackCard,
@@ -70,6 +72,7 @@ function SortableCard({
   commentCount: number;
   isHidden: boolean;
   isOpen: boolean;
+  lockOpen?: boolean;
   onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
   onToggleHideCard: (cardId: string) => void;
   onCheckBackCard?: (cardId: string) => void;
@@ -120,6 +123,7 @@ function SortableCard({
         commentCount={commentCount}
         isHidden={isHidden}
         isOpen={isOpen}
+        lockOpen={lockOpen}
         onToggleOpen={() => onToggleCardOpen(item.id)}
         onToggleHide={() => onToggleHideCard(item.id)}
         onCheckBack={
@@ -138,6 +142,7 @@ function StaticCardList({
   commentCounts,
   hiddenCardIds,
   cardOpenStates,
+  forcedOpenCardId,
   onToggleCardOpen,
   onToggleHideCard,
   onCheckBackCard,
@@ -149,6 +154,7 @@ function StaticCardList({
   commentCounts: Record<string, number>;
   hiddenCardIds: Set<string>;
   cardOpenStates: Record<string, boolean>;
+  forcedOpenCardId?: string | null;
   onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
   onToggleHideCard: (cardId: string) => void;
   onCheckBackCard?: (cardId: string) => void;
@@ -165,6 +171,7 @@ function StaticCardList({
             commentCount={commentCounts[item.id] ?? 0}
             isHidden={hiddenCardIds.has(item.id)}
             isOpen={resolveCardOpen(cardOpenStates, item.id)}
+            lockOpen={forcedOpenCardId === item.id}
             onToggleOpen={() => onToggleCardOpen(item.id)}
             onToggleHide={() => onToggleHideCard(item.id)}
             onCheckBack={
@@ -250,6 +257,7 @@ export function SortableCardList({
   commentCounts,
   hiddenCardIds,
   cardOpenStates,
+  forcedOpenCardId,
   onToggleCardOpen,
   onToggleHideCard,
   onCheckBackCard,
@@ -290,6 +298,7 @@ export function SortableCardList({
         commentCounts={commentCounts}
         hiddenCardIds={hiddenCardIds}
         cardOpenStates={cardOpenStates}
+        forcedOpenCardId={forcedOpenCardId}
         onToggleCardOpen={onToggleCardOpen}
         onToggleHideCard={onToggleHideCard}
         onCheckBackCard={onCheckBackCard}
@@ -318,6 +327,7 @@ export function SortableCardList({
               commentCount={commentCounts[item.id] ?? 0}
               isHidden={hiddenCardIds.has(item.id)}
               isOpen={resolveCardOpen(cardOpenStates, item.id)}
+              lockOpen={forcedOpenCardId === item.id}
               onToggleCardOpen={onToggleCardOpen}
               onToggleHideCard={onToggleHideCard}
               onCheckBackCard={onCheckBackCard}

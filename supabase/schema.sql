@@ -39,11 +39,27 @@ create table public.comment_images (
   created_at timestamptz not null default now()
 );
 
+create table public.comment_mentions (
+  id uuid primary key default gen_random_uuid(),
+  comment_id uuid not null references public.comments (id) on delete cascade,
+  feed_id uuid not null references public.feeds (id) on delete cascade,
+  card_id text not null,
+  mentioned_user_id uuid not null references public.profiles (id) on delete cascade,
+  triggered_by_user_id uuid not null references public.profiles (id) on delete cascade,
+  mention_token text not null,
+  read_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (comment_id, mentioned_user_id)
+);
+
 create index feeds_uploaded_by_idx on public.feeds (uploaded_by);
 create index feeds_updated_at_idx on public.feeds (updated_at desc);
 create index comments_feed_card_idx on public.comments (feed_id, card_id, created_at);
 create index comments_parent_comment_id_idx on public.comments (parent_comment_id);
 create index comment_images_comment_id_idx on public.comment_images (comment_id);
+create index comment_mentions_user_read_idx
+  on public.comment_mentions (mentioned_user_id, read_at, created_at desc);
+create index comment_mentions_comment_idx on public.comment_mentions (comment_id);
 
 create table public.user_hidden_cards (
   id uuid primary key default gen_random_uuid(),
@@ -158,6 +174,7 @@ alter table public.user_collapsed_categories enable row level security;
 alter table public.user_checkback_cards enable row level security;
 alter table public.user_card_open_state enable row level security;
 alter table public.user_feed_view_state enable row level security;
+alter table public.comment_mentions enable row level security;
 alter table public.comment_images enable row level security;
 
 create policy "Profiles are viewable by authenticated users"
@@ -292,6 +309,27 @@ create policy "Admins can delete any comment image"
     )
   );
 
+create policy "Users can view mentions involving them"
+  on public.comment_mentions for select
+  to authenticated
+  using (auth.uid() = mentioned_user_id or auth.uid() = triggered_by_user_id);
+
+create policy "Users can insert mentions they trigger"
+  on public.comment_mentions for insert
+  to authenticated
+  with check (auth.uid() = triggered_by_user_id);
+
+create policy "Users can update mentions they receive"
+  on public.comment_mentions for update
+  to authenticated
+  using (auth.uid() = mentioned_user_id)
+  with check (auth.uid() = mentioned_user_id);
+
+create policy "Users can delete mentions they trigger"
+  on public.comment_mentions for delete
+  to authenticated
+  using (auth.uid() = triggered_by_user_id);
+
 create policy "Users can view own hidden cards"
   on public.user_hidden_cards for select
   to authenticated
@@ -401,3 +439,4 @@ create policy "Users can delete own comment images"
 
 alter publication supabase_realtime add table public.comments;
 alter publication supabase_realtime add table public.comment_images;
+alter publication supabase_realtime add table public.comment_mentions;

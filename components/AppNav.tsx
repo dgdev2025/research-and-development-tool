@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 import { AppLogo } from "@/components/AppLogo";
+import { NotificationMenu } from "@/components/NotificationMenu";
 
 interface AppNavProps {
   profile: Profile;
@@ -67,6 +68,8 @@ export function AppNav({ profile }: AppNavProps) {
               {link.label}
             </Link>
           ))}
+
+          <NotificationMenu profile={profile} />
 
           <div className="user-menu" ref={menuRef}>
             <button

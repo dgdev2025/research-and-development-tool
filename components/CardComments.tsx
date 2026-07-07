@@ -23,8 +23,16 @@ import {
   updateComment,
   uploadCommentImages,
 } from "@/lib/comments";
+import {
+  applyMentionSuggestion,
+  extractMentionQuery,
+  filterMentionSuggestions,
+  getMentionableProfiles,
+  renderMentionText,
+  type MentionSuggestion,
+} from "@/lib/mentions";
 import { formatDate } from "@/lib/profiles";
-import type { CommentWithAuthor } from "@/lib/types";
+import type { CommentWithAuthor, Profile } from "@/lib/types";
 import type { FeedItem } from "@/lib/parseFeed";
 import { ImageSliderModal, type SliderImage } from "./ImageSliderModal";
 import { GalleryThumbSlider } from "./GalleryThumbSlider";
@@ -59,6 +67,7 @@ interface ReplyTarget {
 
 interface CardCommentsContextValue {
   comments: CommentWithAuthor[];
+  mentionableProfiles: Pick<Profile, "id" | "email" | "full_name">[];
   allImages: SliderImage[];
   imageIndexRangesByCommentId: Map<string, number[]>;
   commentsById: Map<string, CommentWithAuthor>;
@@ -111,6 +120,9 @@ export function CardCommentsProvider({
   children,
 }: CardCommentsProviderProps) {
   const [comments, setComments] = useState<CommentWithAuthor[]>([]);
+  const [mentionableProfiles, setMentionableProfiles] = useState<
+    Pick<Profile, "id" | "email" | "full_name">[]
+  >([]);
   const [body, setBody] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -136,6 +148,27 @@ export function CardCommentsProvider({
   useEffect(() => {
     loadComments();
   }, [loadComments]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProfiles() {
+      try {
+        const supabase = createClient();
+        const profiles = await getMentionableProfiles(supabase);
+        if (!cancelled) {
+          setMentionableProfiles(profiles);
+        }
+      } catch {
+        // Mention suggestions are optional; ignore failure.
+      }
+    }
+
+    void loadProfiles();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -343,6 +376,7 @@ export function CardCommentsProvider({
 
   const value: CardCommentsContextValue = {
     comments,
+    mentionableProfiles,
     allImages,
     imageIndexRangesByCommentId,
     commentsById,
@@ -407,6 +441,7 @@ function CommentBubble({
 }) {
   const {
     allImages,
+    mentionableProfiles,
     userId,
     openSlider,
     startReply,
@@ -487,8 +522,13 @@ function CommentBubble({
     setMenuOpen(false);
   };
 
+  const renderedBody = useMemo(
+    () => renderMentionText(comment.body, mentionableProfiles),
+    [comment.body, mentionableProfiles]
+  );
+
   return (
-    <article className="comment-item">
+    <article id={`comment-${comment.id}`} className="comment-item">
       <InitialAvatar profile={comment.author} size={36} className="comment-avatar" />
       <div className="comment-content">
         <div className="comment-meta">
@@ -587,7 +627,19 @@ function CommentBubble({
           </div>
         ) : (
           <>
-            {comment.body && <p className="comment-body">{comment.body}</p>}
+            {comment.body && (
+              <p className="comment-body">
+                {renderedBody.map((part, index) =>
+                  part.mentionedUserId ? (
+                    <span key={`${part.mentionedUserId}-${index}`} className="comment-mention">
+                      {part.text}
+                    </span>
+                  ) : (
+                    <span key={index}>{part.text}</span>
+                  )
+                )}
+              </p>
+            )}
             {imageIndexes.length > 0 && (
               <div className="comment-image-chips">
                 {imageIndexes.map((imageIndex) => (
@@ -612,6 +664,7 @@ function CommentBubble({
 export function CardCommentPanel() {
   const {
     comments,
+    mentionableProfiles,
     allImages,
     imageIndexRangesByCommentId,
     commentsById,
@@ -623,6 +676,7 @@ export function CardCommentPanel() {
     submitting,
     error,
     canSubmit,
+    userId,
     replyingTo,
     clearReply,
     addImageFiles,
@@ -634,6 +688,8 @@ export function CardCommentPanel() {
   } = useCardComments();
 
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COMMENTS);
+  const [mentionSuggestions, setMentionSuggestions] = useState<MentionSuggestion[]>([]);
+  const [activeMentionIndex, setActiveMentionIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const commentsListRef = useRef<HTMLDivElement>(null);
 
@@ -682,6 +738,72 @@ export function CardCommentPanel() {
       textareaRef.current?.focus();
     }
   }, [replyingTo]);
+
+  useEffect(() => {
+    if (loading || comments.length === 0 || typeof window === "undefined") return;
+    const hash = window.location.hash;
+    if (!hash.startsWith("#comment-")) return;
+
+    const target = document.getElementById(hash.slice(1));
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("comment-item-highlight");
+
+    const timeout = window.setTimeout(() => {
+      target.classList.remove("comment-item-highlight");
+    }, 2200);
+
+    return () => {
+      window.clearTimeout(timeout);
+      target.classList.remove("comment-item-highlight");
+    };
+  }, [comments, loading]);
+
+  const updateMentionSuggestions = useCallback(
+    (nextBody: string, caretIndex: number) => {
+      const query = extractMentionQuery(nextBody, caretIndex);
+      if (query === null) {
+        setMentionSuggestions([]);
+        setActiveMentionIndex(0);
+        return;
+      }
+
+      const nextSuggestions = filterMentionSuggestions(
+        mentionableProfiles,
+        query,
+        userId
+      );
+      setMentionSuggestions(nextSuggestions);
+      setActiveMentionIndex(0);
+    },
+    [mentionableProfiles, userId]
+  );
+
+  const selectMentionSuggestion = useCallback(
+    (suggestion: MentionSuggestion) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const caretIndex = textarea.selectionStart ?? body.length;
+      const { nextText, nextCaretIndex } = applyMentionSuggestion(
+        body,
+        caretIndex,
+        suggestion
+      );
+
+      setBody(nextText);
+      setMentionSuggestions([]);
+      setActiveMentionIndex(0);
+
+      requestAnimationFrame(() => {
+        textarea.focus();
+        textarea.setSelectionRange(nextCaretIndex, nextCaretIndex);
+        adjustTextareaHeight();
+      });
+    },
+    [adjustTextareaHeight, body, setBody]
+  );
 
   return (
     <div className="card-comments-panel">
@@ -790,10 +912,42 @@ export function CardCommentPanel() {
             ref={textareaRef}
             value={body}
             onChange={(e) => {
-              setBody(e.target.value);
+              const nextValue = e.target.value;
+              setBody(nextValue);
+              updateMentionSuggestions(nextValue, e.target.selectionStart ?? nextValue.length);
               adjustTextareaHeight();
             }}
             onKeyDown={(e) => {
+              if (mentionSuggestions.length > 0) {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setActiveMentionIndex((index) =>
+                    Math.min(index + 1, mentionSuggestions.length - 1)
+                  );
+                  return;
+                }
+
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setActiveMentionIndex((index) => Math.max(index - 1, 0));
+                  return;
+                }
+
+                if (e.key === "Enter" && e.shiftKey === false) {
+                  e.preventDefault();
+                  selectMentionSuggestion(
+                    mentionSuggestions[activeMentionIndex] ?? mentionSuggestions[0]
+                  );
+                  return;
+                }
+
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setMentionSuggestions([]);
+                  return;
+                }
+              }
+
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 if (!submitting && canSubmit) {
@@ -811,6 +965,28 @@ export function CardCommentPanel() {
             rows={1}
             className="comment-input-textarea"
           />
+          {mentionSuggestions.length > 0 && (
+            <div className="mention-suggestions" role="listbox" aria-label="Mention suggestions">
+              {mentionSuggestions.map((suggestion, index) => (
+                <button
+                  key={suggestion.userId}
+                  type="button"
+                  className={`mention-suggestion${
+                    index === activeMentionIndex ? " active" : ""
+                  }`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    selectMentionSuggestion(suggestion);
+                  }}
+                  role="option"
+                  aria-selected={index === activeMentionIndex}
+                >
+                  <span className="mention-suggestion-label">{suggestion.label}</span>
+                  <span className="mention-suggestion-email">@{suggestion.email}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <button
             type="submit"
             className="comment-send-btn"

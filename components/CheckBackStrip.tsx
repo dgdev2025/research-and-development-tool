@@ -23,6 +23,7 @@ interface CheckBackStripProps {
   userId: string;
   commentCounts: Record<string, number>;
   cardOpenStates: Record<string, boolean>;
+  forcedOpenCardId?: string | null;
   stripOpen: boolean;
   expandedEntryIds: Set<string>;
   onToggleStrip: () => void;
@@ -71,6 +72,7 @@ export function CheckBackStrip({
   userId,
   commentCounts,
   cardOpenStates,
+  forcedOpenCardId,
   stripOpen,
   expandedEntryIds,
   onToggleStrip,
@@ -220,6 +222,7 @@ export function CheckBackStrip({
                     userId={userId}
                     commentCount={commentCount}
                     isOpen={resolveCardOpen(cardOpenStates, location.item.id)}
+                    lockOpen={forcedOpenCardId === location.item.id}
                     onToggleOpen={() => onToggleCardOpen(location.item.id)}
                     onCommentAdded={() =>
                       onCommentCountChange(location.item.id, 1)

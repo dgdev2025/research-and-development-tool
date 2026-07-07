@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { ParsedFeed } from "@/lib/parseFeed";
 import { findFeedItem } from "@/lib/parseFeed";
 import {
@@ -68,6 +69,7 @@ export function FeedDisplay({
   onFeedChange,
   onCommentCountChange,
 }: FeedDisplayProps) {
+  const searchParams = useSearchParams();
   const itemCount = countItems(feed);
   const [hiddenCardIds, setHiddenCardIds] = useState<Set<string>>(new Set());
   const [checkBacks, setCheckBacks] = useState<CheckBackRow[]>([]);
@@ -82,6 +84,7 @@ export function FeedDisplay({
   const [checkBackPickerCardId, setCheckBackPickerCardId] = useState<string | null>(
     null
   );
+  const targetCardId = searchParams.get("card");
 
   const persistPanelViewState = useCallback(
     async (stripOpen: boolean, expandedIds: string[]) => {
@@ -181,6 +184,21 @@ export function FeedDisplay({
     persistPanelViewState,
     prefsLoaded,
   ]);
+
+  useEffect(() => {
+    if (!targetCardId) return;
+    if (!checkBacks.some((row) => row.card_id === targetCardId)) return;
+
+    if (!checkBackStripOpen) {
+      setCheckBackStripOpen(true);
+    }
+
+    if (expandedCheckBackCardIds.has(targetCardId)) return;
+
+    const nextExpanded = new Set(expandedCheckBackCardIds);
+    nextExpanded.add(targetCardId);
+    setExpandedCheckBackCardIds(nextExpanded);
+  }, [checkBackStripOpen, checkBacks, expandedCheckBackCardIds, targetCardId]);
 
   const feedSaveStatus = useAutoSaveFeed(feedId, feed, canReorder);
 
@@ -431,6 +449,7 @@ export function FeedDisplay({
         userId={userId}
         commentCounts={commentCounts}
         cardOpenStates={cardOpenStates}
+        forcedOpenCardId={targetCardId}
         stripOpen={checkBackStripOpen}
         expandedEntryIds={expandedCheckBackCardIds}
         onToggleStrip={handleToggleCheckBackStrip}
@@ -458,6 +477,7 @@ export function FeedDisplay({
             hiddenCardIds={hiddenCardIds}
             checkBackCardIds={checkBackCardIds}
             cardOpenStates={cardOpenStates}
+            forcedOpenCardId={targetCardId}
             onToggleCardOpen={handleToggleCardOpen}
             showHidden={!!showHiddenByCategory[category.title]}
             onToggleShowHidden={() => handleToggleShowHidden(category.title)}

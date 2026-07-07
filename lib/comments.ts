@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getMentionableProfiles } from "./mentions";
+import { syncCommentMentions } from "./notifications";
 import type { CommentWithAuthor } from "./types";
 
 const COMMENT_SELECT = `
@@ -164,7 +166,10 @@ export async function createComment(
     images = imageRows ?? [];
   }
 
-  return { ...comment, images } as unknown as CommentWithAuthor;
+  const nextComment = { ...comment, images } as unknown as CommentWithAuthor;
+  const profiles = await getMentionableProfiles(supabase);
+  await syncCommentMentions(supabase, nextComment, profiles);
+  return nextComment;
 }
 
 export async function uploadCommentImage(
@@ -215,7 +220,11 @@ export async function updateComment(
     .single();
 
   if (error) throw error;
-  return data as unknown as CommentWithAuthor;
+
+  const nextComment = data as unknown as CommentWithAuthor;
+  const profiles = await getMentionableProfiles(supabase);
+  await syncCommentMentions(supabase, nextComment, profiles);
+  return nextComment;
 }
 
 export async function deleteComment(

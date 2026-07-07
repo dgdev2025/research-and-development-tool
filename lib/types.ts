@@ -52,3 +52,21 @@ export interface CommentWithAuthor extends CommentRow {
   author: Pick<Profile, "id" | "email" | "full_name"> | null;
   images: CommentImageRow[];
 }
+
+export interface CommentMentionRow {
+  id: string;
+  comment_id: string;
+  feed_id: string;
+  card_id: string;
+  mentioned_user_id: string;
+  triggered_by_user_id: string;
+  mention_token: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface CommentMentionNotification extends CommentMentionRow {
+  comment: Pick<CommentRow, "id" | "body" | "created_at"> | null;
+  feed: Pick<FeedRow, "id" | "title"> | null;
+  actor: Pick<Profile, "id" | "email" | "full_name"> | null;
+}

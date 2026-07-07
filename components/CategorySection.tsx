@@ -14,6 +14,7 @@ interface CategorySectionProps {
   hiddenCardIds: Set<string>;
   checkBackCardIds: Set<string>;
   cardOpenStates: Record<string, boolean>;
+  forcedOpenCardId?: string | null;
   onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
   showHidden: boolean;
   onToggleShowHidden: () => void;
@@ -46,6 +47,7 @@ export function CategorySection({
   hiddenCardIds,
   checkBackCardIds,
   cardOpenStates,
+  forcedOpenCardId,
   onToggleCardOpen,
   showHidden,
   onToggleShowHidden,
@@ -113,6 +115,7 @@ export function CategorySection({
           commentCounts={commentCounts}
           hiddenCardIds={hiddenCardIds}
           cardOpenStates={cardOpenStates}
+          forcedOpenCardId={forcedOpenCardId}
           onToggleCardOpen={onToggleCardOpen}
           onToggleHideCard={onToggleHideCard}
           onCheckBackCard={onCheckBackCard}
@@ -152,6 +155,7 @@ export function CategorySection({
                 commentCounts={commentCounts}
                 hiddenCardIds={hiddenCardIds}
                 cardOpenStates={cardOpenStates}
+                forcedOpenCardId={forcedOpenCardId}
                 onToggleCardOpen={onToggleCardOpen}
                 onToggleHideCard={onToggleHideCard}
                 onCheckBackCard={onCheckBackCard}

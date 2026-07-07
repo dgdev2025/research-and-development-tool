@@ -2,3 +2,4 @@
 
 alter publication supabase_realtime add table public.comments;
 alter publication supabase_realtime add table public.comment_images;
+alter publication supabase_realtime add table public.comment_mentions;
