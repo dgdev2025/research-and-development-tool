@@ -1041,6 +1041,7 @@ button {
   border-left: 1px solid var(--border);
   padding-left: 1.25rem;
   max-height: 520px;
+  overflow: visible;
 }
 
 .card-comments-panel {
@@ -1049,7 +1050,7 @@ button {
   gap: 0.75rem;
   min-height: 0;
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .card-comments-panel .comments-list {
@@ -1088,6 +1089,7 @@ button {
 
 .item-card.comments-open {
   padding-bottom: 1.25rem;
+  overflow: visible;
 }
 
 @keyframes expandComments {
