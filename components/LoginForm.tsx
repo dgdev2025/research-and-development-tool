@@ -9,9 +9,10 @@ import { AppLogo } from "@/components/AppLogo";
 interface LoginFormProps {
   redirectTo?: string;
   message?: string;
+  error?: string;
 }
 
-export function LoginForm({ redirectTo, message }: LoginFormProps) {
+export function LoginForm({ redirectTo, message, error: authError }: LoginFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -67,6 +68,13 @@ export function LoginForm({ redirectTo, message }: LoginFormProps) {
           <div className="info-msg">
             Contributors can view feeds on the dashboard and comment on cards.
             Import and settings are limited to admins.
+          </div>
+        )}
+
+        {authError === "auth" && (
+          <div className="info-msg">
+            Your invite link may have expired or already been used. Ask an admin to
+            resend your invitation, then open the new link to set your password.
           </div>
         )}
 

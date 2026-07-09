@@ -2,37 +2,11 @@
 
 import { useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-
-function buildCallbackUrl(search: string, hash: string): string | null {
-  const params = new URLSearchParams(search);
-  const code = params.get("code");
-  const tokenHash = params.get("token_hash");
-  const type = params.get("type");
-
-  if (code) {
-    const callbackParams = new URLSearchParams({
-      code,
-      type: type ?? "invite",
-      next: "/auth/set-password",
-    });
-    return `/auth/callback?${callbackParams.toString()}`;
-  }
-
-  if (tokenHash && type) {
-    const confirmParams = new URLSearchParams({
-      token_hash: tokenHash,
-      type,
-      next: "/auth/set-password",
-    });
-    return `/auth/confirm?${confirmParams.toString()}`;
-  }
-
-  if (hash.includes("access_token")) {
-    return null;
-  }
-
-  return null;
-}
+import {
+  buildAuthCallbackUrl,
+  parseAuthHash,
+  shouldRequirePasswordSetup,
+} from "@/lib/authRedirect";
 
 export function AuthRedirectHandler() {
   useEffect(() => {
@@ -41,31 +15,46 @@ export function AuthRedirectHandler() {
     async function handleAuthRedirect() {
       const { pathname, search, hash } = window.location;
 
-      if (pathname.startsWith("/auth/callback") || pathname.startsWith("/auth/confirm")) {
-        return;
-      }
-
-      const callbackUrl = buildCallbackUrl(search, hash);
-      if (callbackUrl) {
+      const callbackUrl = buildAuthCallbackUrl(search);
+      if (
+        callbackUrl &&
+        !pathname.startsWith("/auth/callback") &&
+        !pathname.startsWith("/auth/confirm")
+      ) {
         window.location.replace(callbackUrl);
         return;
       }
 
-      if (!hash.includes("access_token")) {
+      const hashTokens = parseAuthHash(hash);
+      if (!hashTokens) {
         return;
       }
 
       const supabase = createClient();
-      const { data, error } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.setSession({
+        access_token: hashTokens.accessToken,
+        refresh_token: hashTokens.refreshToken,
+      });
 
-      if (cancelled || error || !data.session) {
+      if (cancelled || error || !data.session?.user) {
         return;
       }
 
-      const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
-      const type = hashParams.get("type");
+      const searchParams = new URLSearchParams(search);
+      const next = searchParams.get("next");
+      const type = searchParams.get("type") ?? hashTokens.type;
+      const user = data.session.user;
 
-      if (type === "invite" || type === "signup") {
+      const mustSetPassword = shouldRequirePasswordSetup({
+        type,
+        next,
+        requirePasswordSetup: user.app_metadata?.require_password_setup === true,
+        needsPasswordSetup: user.user_metadata?.needs_password_setup === true,
+        invitedAt: user.invited_at,
+        passwordSetupComplete: user.app_metadata?.password_setup_complete === true,
+      });
+
+      if (mustSetPassword) {
         await fetch("/api/auth/prepare-invite-session", { method: "POST" });
         window.location.replace("/auth/set-password");
         return;

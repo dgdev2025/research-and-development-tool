@@ -2,17 +2,17 @@ import { LoginForm } from "@/components/LoginForm";
 import { SupabaseSetupBanner } from "@/components/SupabaseSetupBanner";
 
 interface LoginPageProps {
-  searchParams: Promise<{ redirect?: string; message?: string }>;
+  searchParams: Promise<{ redirect?: string; message?: string; error?: string }>;
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const { redirect, message } = await searchParams;
+  const { redirect, message, error } = await searchParams;
 
   return (
     <main className="auth-page">
       <div className="auth-page-inner">
         <SupabaseSetupBanner />
-        <LoginForm redirectTo={redirect} message={message} />
+        <LoginForm redirectTo={redirect} message={message} error={error} />
       </div>
     </main>
   );

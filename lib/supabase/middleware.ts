@@ -26,12 +26,16 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute = pathname === "/login";
   const isAuthCallback = pathname === "/auth/callback";
   const isAuthConfirm = pathname === "/auth/confirm";
+  const isAuthHashHandler = pathname === "/auth/hash-handler";
   const isSetPasswordRoute = pathname === "/auth/set-password";
+  const isHomeRoute = pathname === "/";
   const isPublicRoute =
     isAuthRoute ||
     isAuthCallback ||
     isAuthConfirm ||
+    isAuthHashHandler ||
     isSetPasswordRoute ||
+    isHomeRoute ||
     pathname === "/api/health";
 
   const authCode = request.nextUrl.searchParams.get("code");
@@ -118,7 +122,7 @@ export async function updateSession(request: NextRequest) {
       (route) => pathname === route || pathname.startsWith(`${route}/`)
     );
 
-    if (mustSetPassword && !isSetPasswordRoute && !isAuthCallback && !isAuthConfirm) {
+    if (mustSetPassword && !isSetPasswordRoute && !isAuthCallback && !isAuthConfirm && !isAuthHashHandler) {
       const url = request.nextUrl.clone();
       url.pathname = "/auth/set-password";
       url.search = "";
