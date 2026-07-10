@@ -154,8 +154,10 @@ function linkifyPlainText(text: string): CommentTextPart[] {
 
 export function renderMentionText(
   body: string,
-  profiles: Pick<Profile, "id" | "email" | "full_name">[]
+  profiles: Pick<Profile, "id" | "email" | "full_name">[],
+  options?: { preserveTokenText?: boolean }
 ): CommentTextPart[] {
+  const preserveTokenText = options?.preserveTokenText === true;
   const byToken = new Map<string, Pick<Profile, "id" | "email" | "full_name">>();
   for (const profile of profiles) {
     byToken.set(profile.email.toLowerCase(), profile);
@@ -182,7 +184,8 @@ export function renderMentionText(
     const profile = rawToken ? byToken.get(rawToken) : null;
     if (profile && token) {
       parts.push({
-        text: `@${getMentionLabel(profile)}`,
+        // Composer overlays must keep the exact typed characters or the caret drifts.
+        text: preserveTokenText ? token : `@${getMentionLabel(profile)}`,
         mentionedUserId: profile.id,
       });
     } else {

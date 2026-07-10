@@ -2488,7 +2488,7 @@ select.invite-field {
 
 .comment-input-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.5rem;
   width: 100%;
   min-width: 0;
@@ -2510,12 +2510,35 @@ select.invite-field {
 .comment-input-highlight {
   position: absolute;
   inset: 0;
+  margin: 0;
   padding: 0.4rem 0.25rem;
+  border: none;
+  box-sizing: border-box;
+  overflow: hidden;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   word-break: break-word;
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
   line-height: 1.4;
   color: var(--text);
   pointer-events: none;
+  z-index: 0;
+  scrollbar-gutter: stable;
+}
+
+.comment-input-highlight .comment-mention {
+  font-weight: inherit;
+  color: var(--accent);
+}
+
+.comment-input-highlight .comment-link {
+  font-weight: inherit;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  text-decoration: none;
 }
 
 .mention-suggestions {
@@ -2575,20 +2598,27 @@ select.invite-field {
   background: transparent;
   resize: none;
   font: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
   color: var(--text);
   padding: 0.4rem 0.25rem;
   height: 2.5rem;
   min-height: 2.5rem;
-  max-height: 6em;
-  overflow-y: auto;
+  max-height: 8.4em;
+  overflow-y: hidden;
   outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   line-height: 1.4;
   position: relative;
   z-index: 1;
+  scrollbar-gutter: stable;
 }
 
 .comment-input-text-wrap.has-content .comment-input-textarea {
   color: transparent;
+  -webkit-text-fill-color: transparent;
   caret-color: var(--text);
 }
 

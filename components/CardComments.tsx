@@ -711,6 +711,7 @@ export function CardCommentPanel() {
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COMMENTS);
   const [mentionSuggestions, setMentionSuggestions] = useState<MentionSuggestion[]>([]);
   const [activeMentionIndex, setActiveMentionIndex] = useState(0);
+  const highlightRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const commentsListRef = useRef<HTMLDivElement>(null);
 
@@ -742,12 +743,27 @@ export function CardCommentPanel() {
 
   const adjustTextareaHeight = useCallback(() => {
     const textarea = textareaRef.current;
+    const highlight = highlightRef.current;
     if (!textarea) return;
 
-    textarea.style.height = "2.5rem";
-    const maxHeight = parseFloat(getComputedStyle(textarea).maxHeight);
-    const nextHeight = Math.min(textarea.scrollHeight, maxHeight || textarea.scrollHeight);
+    textarea.style.height = "0px";
+    textarea.style.overflowY = "hidden";
+
+    const styles = getComputedStyle(textarea);
+    const minHeight = parseFloat(styles.minHeight) || 40;
+    const maxHeight = parseFloat(styles.maxHeight) || 134;
+    const nextHeight = Math.min(
+      Math.max(textarea.scrollHeight, minHeight),
+      maxHeight
+    );
+
     textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY =
+      textarea.scrollHeight > maxHeight + 1 ? "auto" : "hidden";
+
+    if (highlight) {
+      highlight.scrollTop = textarea.scrollTop;
+    }
   }, []);
 
   useEffect(() => {
@@ -826,8 +842,16 @@ export function CardCommentPanel() {
     [adjustTextareaHeight, body, setBody]
   );
   const renderedComposerBody = useMemo(
-    () => renderMentionText(body, mentionableProfiles),
+    () =>
+      renderMentionText(body, mentionableProfiles, { preserveTokenText: true }),
     [body, mentionableProfiles]
+  );
+  const composerNeedsHighlight = useMemo(
+    () =>
+      renderedComposerBody.some(
+        (part) => Boolean(part.mentionedUserId) || Boolean(part.href)
+      ),
+    [renderedComposerBody]
   );
 
   return (
@@ -933,9 +957,13 @@ export function CardCommentPanel() {
               }}
             />
           </label>
-          <div className={`comment-input-text-wrap${body ? " has-content" : ""}`}>
-            {body && (
-              <div className="comment-input-highlight" aria-hidden="true">
+          <div
+            className={`comment-input-text-wrap${
+              composerNeedsHighlight ? " has-content" : ""
+            }`}
+          >
+            {composerNeedsHighlight && (
+              <div ref={highlightRef} className="comment-input-highlight" aria-hidden="true">
                 {renderedComposerBody.map((part, index) =>
                   part.mentionedUserId ? (
                     <span key={`${part.mentionedUserId}-${index}`} className="comment-mention">
@@ -959,6 +987,11 @@ export function CardCommentPanel() {
                 setBody(nextValue);
                 updateMentionSuggestions(nextValue, e.target.selectionStart ?? nextValue.length);
                 adjustTextareaHeight();
+              }}
+              onScroll={(e) => {
+                if (highlightRef.current) {
+                  highlightRef.current.scrollTop = e.currentTarget.scrollTop;
+                }
               }}
               onKeyDown={(e) => {
                 if (mentionSuggestions.length > 0) {
