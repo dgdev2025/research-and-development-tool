@@ -15,7 +15,8 @@ const COMMENT_SELECT = `
   author:profiles!user_id (
     id,
     email,
-    full_name
+    full_name,
+    avatar_url
   ),
   images:comment_images (
     id,
@@ -139,7 +140,8 @@ export async function createComment(
       author:profiles!user_id (
         id,
         email,
-        full_name
+        full_name,
+        avatar_url
       )
     `
     )

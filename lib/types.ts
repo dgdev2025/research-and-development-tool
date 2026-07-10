@@ -8,6 +8,7 @@ export interface Profile {
   id: string;
   email: string;
   full_name: string | null;
+  avatar_url: string | null;
   role: UserRole;
   created_at: string;
   updated_at: string;
@@ -27,7 +28,7 @@ export interface FeedRow {
 }
 
 export interface FeedWithUploader extends FeedRow {
-  uploader: Pick<Profile, "id" | "email" | "full_name"> | null;
+  uploader: Pick<Profile, "id" | "email" | "full_name" | "avatar_url"> | null;
 }
 
 export interface CommentRow {
@@ -49,7 +50,7 @@ export interface CommentImageRow {
 }
 
 export interface CommentWithAuthor extends CommentRow {
-  author: Pick<Profile, "id" | "email" | "full_name"> | null;
+  author: Pick<Profile, "id" | "email" | "full_name" | "avatar_url"> | null;
   images: CommentImageRow[];
 }
 
@@ -68,5 +69,5 @@ export interface CommentMentionRow {
 export interface CommentMentionNotification extends CommentMentionRow {
   comment: Pick<CommentRow, "id" | "body" | "created_at"> | null;
   feed: Pick<FeedRow, "id" | "title"> | null;
-  actor: Pick<Profile, "id" | "email" | "full_name"> | null;
+  actor: Pick<Profile, "id" | "email" | "full_name" | "avatar_url"> | null;
 }

@@ -16,7 +16,8 @@ export async function getFeeds(supabase: SupabaseClient): Promise<FeedWithUpload
       uploader:profiles!uploaded_by (
         id,
         email,
-        full_name
+        full_name,
+        avatar_url
       )
     `
     )
@@ -43,7 +44,8 @@ export async function getFeedById(
       uploader:profiles!uploaded_by (
         id,
         email,
-        full_name
+        full_name,
+        avatar_url
       )
     `
     )

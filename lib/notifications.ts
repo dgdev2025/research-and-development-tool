@@ -24,7 +24,8 @@ const NOTIFICATION_SELECT = `
   actor:profiles!comment_mentions_triggered_by_user_id_fkey (
     id,
     email,
-    full_name
+    full_name,
+    avatar_url
   )
 `;
 

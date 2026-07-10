@@ -6,6 +6,7 @@ create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   email text not null,
   full_name text,
+  avatar_url text,
   role public.user_role not null default 'contributor',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -422,6 +423,10 @@ insert into storage.buckets (id, name, public)
 values ('comment-images', 'comment-images', true)
 on conflict (id) do nothing;
 
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
 create policy "Authenticated users can upload comment images"
   on storage.objects for insert
   to authenticated
@@ -436,6 +441,39 @@ create policy "Users can delete own comment images"
   on storage.objects for delete
   to authenticated
   using (bucket_id = 'comment-images' and auth.uid()::text = (storage.foldername(name))[1]);
+
+create policy "Authenticated users can upload their own avatar"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'avatars'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Avatar images are publicly readable"
+  on storage.objects for select
+  to public
+  using (bucket_id = 'avatars');
+
+create policy "Users can update their own avatar"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'avatars'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  )
+  with check (
+    bucket_id = 'avatars'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Users can delete their own avatar"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'avatars'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
 
 alter publication supabase_realtime add table public.comments;
 alter publication supabase_realtime add table public.comment_images;

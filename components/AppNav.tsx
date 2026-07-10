@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { displayName } from "@/lib/profiles";
 import type { Profile } from "@/lib/types";
 import { AppLogo } from "@/components/AppLogo";
+import { InitialAvatar } from "@/components/InitialAvatar";
 import { NotificationMenu } from "@/components/NotificationMenu";
 
 interface AppNavProps {
@@ -18,6 +20,7 @@ export function AppNav({ profile }: AppNavProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const isAdmin = profile.role === "admin";
+  const name = displayName(profile);
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -50,7 +53,6 @@ export function AppNav({ profile }: AppNavProps) {
   const links = [
     { href: "/dashboard", label: "Dashboard" },
     ...(isAdmin ? [{ href: "/feeds/new", label: "Import Feed" }] : []),
-    ...(isAdmin ? [{ href: "/settings", label: "Settings" }] : []),
   ];
 
   return (
@@ -79,7 +81,8 @@ export function AppNav({ profile }: AppNavProps) {
               aria-expanded={menuOpen}
               aria-haspopup="menu"
             >
-              <span className="user-menu-email">{profile.email}</span>
+              <InitialAvatar profile={profile} size={28} className="user-menu-avatar" />
+              <span className="user-menu-email">{name}</span>
               <svg
                 className="user-menu-chevron"
                 width="14"
@@ -101,9 +104,36 @@ export function AppNav({ profile }: AppNavProps) {
             {menuOpen && (
               <div className="user-menu-dropdown" role="menu">
                 <div className="user-menu-header">
-                  <span className="user-menu-dropdown-email">{profile.email}</span>
+                  <div className="user-menu-header-main">
+                    <InitialAvatar profile={profile} size={36} />
+                    <div className="user-menu-header-text">
+                      <span className="user-menu-dropdown-name">{name}</span>
+                      <span className="user-menu-dropdown-email">{profile.email}</span>
+                    </div>
+                  </div>
                   <span className="role-badge">{profile.role}</span>
                 </div>
+
+                <Link
+                  href="/settings"
+                  className={`user-menu-item${pathname === "/settings" ? " active" : ""}`}
+                  role="menuitem"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Settings
+                </Link>
+
+                {isAdmin && (
+                  <Link
+                    href="/teams"
+                    className={`user-menu-item${pathname === "/teams" ? " active" : ""}`}
+                    role="menuitem"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Teams
+                  </Link>
+                )}
+
                 <button
                   type="button"
                   className="user-menu-signout"

@@ -3,7 +3,7 @@ import { displayName } from "@/lib/profiles";
 import type { Profile } from "@/lib/types";
 
 interface InitialAvatarProps {
-  profile: Pick<Profile, "id" | "email" | "full_name"> | null;
+  profile: Pick<Profile, "id" | "email" | "full_name" | "avatar_url"> | null;
   size?: number;
   className?: string;
 }
@@ -17,6 +17,7 @@ export function InitialAvatar({
   const seed = profile?.id ?? profile?.email ?? initial;
   const { bg, fg } = getAvatarColor(seed);
   const label = displayName(profile);
+  const avatarUrl = profile?.avatar_url?.trim() || null;
 
   return (
     <div
@@ -24,14 +25,19 @@ export function InitialAvatar({
       style={{
         width: size,
         height: size,
-        backgroundColor: bg,
+        backgroundColor: avatarUrl ? "transparent" : bg,
         color: fg,
         fontSize: Math.round(size * 0.42),
       }}
       aria-label={label}
       title={label}
     >
-      {initial}
+      {avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={avatarUrl} alt={label} className="initial-avatar-image" />
+      ) : (
+        initial
+      )}
     </div>
   );
 }

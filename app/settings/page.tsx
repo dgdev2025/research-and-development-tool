@@ -1,11 +1,8 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
-import { InviteUserForm } from "@/components/InviteUserForm";
-import { SettingsUsers } from "@/components/SettingsUsers";
+import { ProfileSettingsForm } from "@/components/ProfileSettingsForm";
 import { createClient } from "@/lib/supabase/server";
-import { getAllProfiles, getProfile } from "@/lib/profiles";
-import { getSettingsUsers } from "@/lib/users";
-import { isServiceRoleConfigured } from "@/lib/env";
+import { getProfile } from "@/lib/profiles";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -16,43 +13,20 @@ export default async function SettingsPage() {
   if (!user) redirect("/login");
 
   const profile = await getProfile(supabase, user.id);
-  if (profile?.role !== "admin") {
-    redirect("/login?message=contributor-access");
-  }
-
-  const users = isServiceRoleConfigured()
-    ? await getSettingsUsers(supabase)
-    : (await getAllProfiles(supabase)).map((profile) => ({
-        ...profile,
-        status: "active" as const,
-      }));
+  if (!profile) redirect("/login");
 
   return (
     <AppShell>
       <div className="page-header">
         <div>
           <h1>Settings</h1>
-          <p>Manage users and roles</p>
+          <p>Update your profile name and photo</p>
         </div>
       </div>
 
-      <div className="settings-info">
-        <p>
-          <strong>Admin</strong> — can import feeds, reorder cards, delete
-          feeds, and manage users.
-        </p>
-        <p>
-          <strong>Contributor</strong> — can view the dashboard, open feeds, and
-          comment on cards.
-        </p>
-        <p>
-          Invited users must set a password from the invite link before they
-          can sign in. Re-send invites after changing production URL settings.
-        </p>
-      </div>
-
-      <InviteUserForm />
-      <SettingsUsers initialUsers={users} currentUserId={user.id} />
+      <section className="settings-card" aria-label="User settings">
+        <ProfileSettingsForm profile={profile} />
+      </section>
     </AppShell>
   );
 }

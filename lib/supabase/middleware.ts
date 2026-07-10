@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { needsPasswordSetup } from "@/lib/auth";
 import { getSupabaseEnv, isSupabaseConfigured } from "@/lib/env";
 
-const ADMIN_ONLY_ROUTES = ["/feeds/new", "/settings"];
+const ADMIN_ONLY_ROUTES = ["/feeds/new", "/teams"];
 
 async function getUserRole(
   supabase: ReturnType<typeof createServerClient>,
