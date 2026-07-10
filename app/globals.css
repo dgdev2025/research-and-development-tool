@@ -1062,6 +1062,7 @@ button {
 .card-comments-panel .comment-form-inline {
   flex-shrink: 0;
   margin-top: auto;
+  width: 100%;
 }
 
 .comments-load-more {
@@ -2357,6 +2358,8 @@ select.invite-field {
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
+  width: 100%;
+  box-sizing: border-box;
   padding: 0.65rem 0.85rem;
   background: var(--accent-soft);
   border: 1px solid var(--border);
@@ -2364,6 +2367,7 @@ select.invite-field {
 }
 
 .comment-reply-banner-text {
+  flex: 1;
   font-size: 0.82rem;
   color: var(--text-muted);
   min-width: 0;
@@ -2428,6 +2432,19 @@ select.invite-field {
   margin: 0;
   font-size: 0.875rem;
   color: var(--text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.comment-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+}
+
+.comment-link:hover {
+  color: var(--accent-hover);
 }
 
 .comment-image-link {
@@ -2454,6 +2471,9 @@ select.invite-field {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .comment-form textarea {
@@ -2470,6 +2490,9 @@ select.invite-field {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 0.4rem 0.5rem;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -2479,7 +2502,8 @@ select.invite-field {
 
 .comment-input-text-wrap {
   position: relative;
-  flex: 1;
+  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
 }
 
@@ -2544,7 +2568,9 @@ select.invite-field {
 }
 
 .comment-input-textarea {
-  flex: 1;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   border: none;
   background: transparent;
   resize: none;

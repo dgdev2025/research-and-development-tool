@@ -645,6 +645,16 @@ function CommentBubble({
                     <span key={`${part.mentionedUserId}-${index}`} className="comment-mention">
                       {part.text}
                     </span>
+                  ) : part.href ? (
+                    <a
+                      key={`link-${index}`}
+                      href={part.href}
+                      className="comment-link"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {part.text}
+                    </a>
                   ) : (
                     <span key={index}>{part.text}</span>
                   )
@@ -929,6 +939,10 @@ export function CardCommentPanel() {
                 {renderedComposerBody.map((part, index) =>
                   part.mentionedUserId ? (
                     <span key={`${part.mentionedUserId}-${index}`} className="comment-mention">
+                      {part.text}
+                    </span>
+                  ) : part.href ? (
+                    <span key={`link-${index}`} className="comment-link">
                       {part.text}
                     </span>
                   ) : (

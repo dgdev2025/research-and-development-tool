@@ -93,10 +93,69 @@ export function parseMentionMatches(
   return [...matches.values()];
 }
 
+export type CommentTextPart = {
+  text: string;
+  mentionedUserId?: string;
+  href?: string;
+};
+
+const URL_REGEX =
+  /\b((?:https?:\/\/|www\.)[^\s<]+[^\s<.,;:!?"')\]])/gi;
+
+function normalizeCommentHref(rawUrl: string): string | null {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+
+  const withProtocol = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(withProtocol);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function linkifyPlainText(text: string): CommentTextPart[] {
+  if (!text) return [];
+
+  const parts: CommentTextPart[] = [];
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(URL_REGEX)) {
+    const rawUrl = match[0];
+    const index = match.index ?? 0;
+    const href = normalizeCommentHref(rawUrl);
+
+    if (index > lastIndex) {
+      parts.push({ text: text.slice(lastIndex, index) });
+    }
+
+    if (href) {
+      parts.push({ text: rawUrl, href });
+    } else {
+      parts.push({ text: rawUrl });
+    }
+
+    lastIndex = index + rawUrl.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({ text: text.slice(lastIndex) });
+  }
+
+  return parts.length > 0 ? parts : [{ text }];
+}
+
 export function renderMentionText(
   body: string,
   profiles: Pick<Profile, "id" | "email" | "full_name">[]
-): Array<{ text: string; mentionedUserId?: string }> {
+): CommentTextPart[] {
   const byToken = new Map<string, Pick<Profile, "id" | "email" | "full_name">>();
   for (const profile of profiles) {
     byToken.set(profile.email.toLowerCase(), profile);
@@ -105,7 +164,7 @@ export function renderMentionText(
       byToken.set(handle, profile);
     }
   }
-  const parts: Array<{ text: string; mentionedUserId?: string }> = [];
+  const parts: CommentTextPart[] = [];
   let lastIndex = 0;
 
   for (const match of body.matchAll(MENTION_REGEX)) {
@@ -117,7 +176,7 @@ export function renderMentionText(
     const tokenStart = index + leading.length;
 
     if (tokenStart > lastIndex) {
-      parts.push({ text: body.slice(lastIndex, tokenStart) });
+      parts.push(...linkifyPlainText(body.slice(lastIndex, tokenStart)));
     }
 
     const profile = rawToken ? byToken.get(rawToken) : null;
@@ -127,14 +186,14 @@ export function renderMentionText(
         mentionedUserId: profile.id,
       });
     } else {
-      parts.push({ text: token ?? fullMatch.trimStart() });
+      parts.push(...linkifyPlainText(token ?? fullMatch.trimStart()));
     }
 
     lastIndex = tokenStart + (token?.length ?? 0);
   }
 
   if (lastIndex < body.length) {
-    parts.push({ text: body.slice(lastIndex) });
+    parts.push(...linkifyPlainText(body.slice(lastIndex)));
   }
 
   return parts;
