@@ -2496,7 +2496,7 @@ select.invite-field {
   padding: 0.45rem 0.55rem;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 1.25rem;
+  border-radius: 10px;
   position: relative;
   overflow: hidden;
 }
