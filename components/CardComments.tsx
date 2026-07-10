@@ -746,22 +746,25 @@ export function CardCommentPanel() {
     const highlight = highlightRef.current;
     if (!textarea) return;
 
-    textarea.style.height = "0px";
+    // Measure natural height without forcing a temporary collapse that can
+    // leave the caret/text visually outside the rounded input shell.
+    textarea.style.height = "auto";
     textarea.style.overflowY = "hidden";
 
     const styles = getComputedStyle(textarea);
-    const minHeight = parseFloat(styles.minHeight) || 40;
-    const maxHeight = parseFloat(styles.maxHeight) || 134;
+    const lineHeight = parseFloat(styles.lineHeight) || 22.4;
+    const minHeight = parseFloat(styles.minHeight) || lineHeight * 1.8;
+    const maxHeight = parseFloat(styles.maxHeight) || lineHeight * 12;
     const nextHeight = Math.min(
       Math.max(textarea.scrollHeight, minHeight),
       maxHeight
     );
 
     textarea.style.height = `${nextHeight}px`;
-    textarea.style.overflowY =
-      textarea.scrollHeight > maxHeight + 1 ? "auto" : "hidden";
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight + 1 ? "auto" : "hidden";
 
     if (highlight) {
+      highlight.style.height = `${nextHeight}px`;
       highlight.scrollTop = textarea.scrollTop;
     }
   }, []);
