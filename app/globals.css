@@ -2649,7 +2649,8 @@ select.invite-field {
   border: 1px solid var(--border);
   border-radius: 10px;
   position: relative;
-  overflow: hidden;
+  /* Keep visible so @mention suggestions can float above the input. */
+  overflow: visible;
 }
 
 .comment-input-text-wrap {
@@ -2708,7 +2709,15 @@ select.invite-field {
   border-radius: 12px;
   background: var(--surface);
   box-shadow: var(--shadow);
-  z-index: 20;
+  z-index: 80;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.mention-suggestions-empty {
+  padding: 0.55rem 0.65rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
 }
 
 .mention-suggestion {

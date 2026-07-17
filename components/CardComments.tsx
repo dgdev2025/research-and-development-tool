@@ -27,7 +27,7 @@ import {
   applyMentionSuggestion,
   extractMentionQuery,
   filterMentionSuggestions,
-  getMentionableProfiles,
+  prefetchMentionableProfiles,
   renderMentionText,
   type MentionSuggestion,
 } from "@/lib/mentions";
@@ -155,7 +155,7 @@ export function CardCommentsProvider({
     async function loadProfiles() {
       try {
         const supabase = createClient();
-        const profiles = await getMentionableProfiles(supabase);
+        const profiles = await prefetchMentionableProfiles(supabase);
         if (!cancelled) {
           setMentionableProfiles(profiles);
         }
@@ -710,6 +710,7 @@ export function CardCommentPanel() {
 
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COMMENTS);
   const [mentionSuggestions, setMentionSuggestions] = useState<MentionSuggestion[]>([]);
+  const [mentionQueryActive, setMentionQueryActive] = useState(false);
   const [activeMentionIndex, setActiveMentionIndex] = useState(0);
   const highlightRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -804,11 +805,13 @@ export function CardCommentPanel() {
     (nextBody: string, caretIndex: number) => {
       const query = extractMentionQuery(nextBody, caretIndex);
       if (query === null) {
+        setMentionQueryActive(false);
         setMentionSuggestions([]);
         setActiveMentionIndex(0);
         return;
       }
 
+      setMentionQueryActive(true);
       const nextSuggestions = filterMentionSuggestions(
         mentionableProfiles,
         query,
@@ -819,6 +822,14 @@ export function CardCommentPanel() {
     },
     [mentionableProfiles, userId]
   );
+
+  // Profiles can arrive after the first "@" keypress — refresh the open menu.
+  useEffect(() => {
+    if (!mentionQueryActive) return;
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    updateMentionSuggestions(body, textarea.selectionStart ?? body.length);
+  }, [body, mentionQueryActive, mentionableProfiles, updateMentionSuggestions]);
 
   const selectMentionSuggestion = useCallback(
     (suggestion: MentionSuggestion) => {
@@ -833,6 +844,7 @@ export function CardCommentPanel() {
       );
 
       setBody(nextText);
+      setMentionQueryActive(false);
       setMentionSuggestions([]);
       setActiveMentionIndex(0);
 
@@ -1045,26 +1057,34 @@ export function CardCommentPanel() {
               className="comment-input-textarea"
             />
           </div>
-          {mentionSuggestions.length > 0 && (
+          {mentionQueryActive && (
             <div className="mention-suggestions" role="listbox" aria-label="Mention suggestions">
-              {mentionSuggestions.map((suggestion, index) => (
-                <button
-                  key={suggestion.userId}
-                  type="button"
-                  className={`mention-suggestion${
-                    index === activeMentionIndex ? " active" : ""
-                  }`}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    selectMentionSuggestion(suggestion);
-                  }}
-                  role="option"
-                  aria-selected={index === activeMentionIndex}
-                >
-                  <span className="mention-suggestion-label">{suggestion.label}</span>
-                  <span className="mention-suggestion-email">@{suggestion.handle}</span>
-                </button>
-              ))}
+              {mentionSuggestions.length > 0 ? (
+                mentionSuggestions.map((suggestion, index) => (
+                  <button
+                    key={suggestion.userId}
+                    type="button"
+                    className={`mention-suggestion${
+                      index === activeMentionIndex ? " active" : ""
+                    }`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      selectMentionSuggestion(suggestion);
+                    }}
+                    role="option"
+                    aria-selected={index === activeMentionIndex}
+                  >
+                    <span className="mention-suggestion-label">{suggestion.label}</span>
+                    <span className="mention-suggestion-email">@{suggestion.handle}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="mention-suggestions-empty">
+                  {mentionableProfiles.length === 0
+                    ? "Loading teammates..."
+                    : "No matching teammates"}
+                </div>
+              )}
             </div>
           )}
           <button

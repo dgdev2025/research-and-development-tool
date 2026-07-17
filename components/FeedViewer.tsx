@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ParsedFeed } from "@/lib/parseFeed";
+import { createClient } from "@/lib/supabase/client";
+import { prefetchMentionableProfiles } from "@/lib/mentions";
 import { FeedDisplay } from "@/components/FeedDisplay";
 
 interface FeedViewerProps {
@@ -21,6 +23,11 @@ export function FeedViewer({
 }: FeedViewerProps) {
   const [feed, setFeed] = useState(initialFeed);
   const [commentCounts, setCommentCounts] = useState(initialCommentCounts);
+
+  useEffect(() => {
+    const supabase = createClient();
+    void prefetchMentionableProfiles(supabase);
+  }, []);
 
   const handleCommentCountChange = (cardId: string, delta: number) => {
     setCommentCounts((prev) => ({

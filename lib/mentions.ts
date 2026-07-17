@@ -239,3 +239,24 @@ export async function getMentionableProfiles(
   if (error) throw error;
   return (data ?? []) as Pick<Profile, "id" | "email" | "full_name">[];
 }
+
+let mentionableProfilesCache:
+  | Promise<Pick<Profile, "id" | "email" | "full_name">[]>
+  | null = null;
+
+/** Shared cache so @mentions are ready as soon as a feed loads. */
+export function prefetchMentionableProfiles(
+  supabase: SupabaseClient
+): Promise<Pick<Profile, "id" | "email" | "full_name">[]> {
+  if (!mentionableProfilesCache) {
+    mentionableProfilesCache = getMentionableProfiles(supabase).catch((error) => {
+      mentionableProfilesCache = null;
+      throw error;
+    });
+  }
+  return mentionableProfilesCache;
+}
+
+export function invalidateMentionableProfilesCache(): void {
+  mentionableProfilesCache = null;
+}
