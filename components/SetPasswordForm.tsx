@@ -2,8 +2,26 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { PageLoader } from "@/components/PageLoader";
 import { AppLogo } from "@/components/AppLogo";
+
+async function readJsonSafe(res: Response): Promise<{ error?: string; role?: string; ok?: boolean }> {
+  const text = await res.text();
+  if (!text) {
+    return {
+      error: res.ok
+        ? "Empty response from server."
+        : `Request failed (${res.status}).`,
+    };
+  }
+
+  try {
+    return JSON.parse(text) as { error?: string; role?: string; ok?: boolean };
+  } catch {
+    return { error: `Unexpected server response (${res.status}).` };
+  }
+}
 
 export function SetPasswordForm() {
   const router = useRouter();
@@ -30,24 +48,32 @@ export function SetPasswordForm() {
     setError(null);
 
     try {
-      const res = await fetch("/api/auth/set-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed to set password.");
+      // Set password on the client session first (most reliable after invite hash auth).
+      const supabase = createClient();
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) {
+        setError(updateError.message);
         setLoading(false);
         return;
       }
 
-      if (data.role === "admin") {
-        router.push("/dashboard");
-      } else {
-        router.replace("/dashboard");
+      const res = await fetch("/api/auth/set-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, alreadyUpdated: true }),
+      });
+
+      const data = await readJsonSafe(res);
+      if (!res.ok) {
+        setError(data.error ?? "Failed to finish password setup.");
+        setLoading(false);
+        return;
       }
+
+      // Pick up cleared require_password_setup flags before leaving this page.
+      await supabase.auth.refreshSession().catch(() => undefined);
+
+      router.replace("/dashboard");
       router.refresh();
     } catch (err) {
       setError(
@@ -58,7 +84,6 @@ export function SetPasswordForm() {
   };
 
   const handleSignOut = async () => {
-    const { createClient } = await import("@/lib/supabase/client");
     const supabase = createClient();
     await supabase.auth.signOut();
     router.replace("/login");

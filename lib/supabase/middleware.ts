@@ -106,7 +106,14 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const isApiRoute = pathname.startsWith("/api/");
+
   if (!user && !isPublicRoute) {
+    // Never HTML-redirect API callers — they expect JSON.
+    if (isApiRoute) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     if (pathname.startsWith("/feeds/")) {
@@ -122,7 +129,16 @@ export async function updateSession(request: NextRequest) {
       (route) => pathname === route || pathname.startsWith(`${route}/`)
     );
 
-    if (mustSetPassword && !isSetPasswordRoute && !isAuthCallback && !isAuthConfirm && !isAuthHashHandler) {
+    // Allow password-setup API calls through; otherwise they get an HTML redirect
+    // and the client fails with "Unexpected end of JSON input".
+    if (
+      mustSetPassword &&
+      !isSetPasswordRoute &&
+      !isAuthCallback &&
+      !isAuthConfirm &&
+      !isAuthHashHandler &&
+      !isApiRoute
+    ) {
       const url = request.nextUrl.clone();
       url.pathname = "/auth/set-password";
       url.search = "";
@@ -131,12 +147,15 @@ export async function updateSession(request: NextRequest) {
 
     if (!mustSetPassword && isSetPasswordRoute) {
       const url = request.nextUrl.clone();
-      url.pathname = role === "admin" ? "/dashboard" : "/dashboard";
+      url.pathname = "/dashboard";
       url.search = "";
       return NextResponse.redirect(url);
     }
 
     if (isAdminOnlyRoute && role !== "admin") {
+      if (isApiRoute) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("message", "contributor-access");
@@ -155,12 +174,6 @@ export async function updateSession(request: NextRequest) {
 
       if (redirectTo?.startsWith("/feeds/")) {
         url.pathname = redirectTo;
-        url.search = "";
-        return NextResponse.redirect(url);
-      }
-
-      if (role === "admin") {
-        url.pathname = "/dashboard";
         url.search = "";
         return NextResponse.redirect(url);
       }
