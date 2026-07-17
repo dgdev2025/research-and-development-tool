@@ -36,7 +36,8 @@ export async function updateSession(request: NextRequest) {
     isAuthHashHandler ||
     isSetPasswordRoute ||
     isHomeRoute ||
-    pathname === "/api/health";
+    pathname === "/api/health" ||
+    pathname === "/api/cron/keepalive";
 
   const authCode = request.nextUrl.searchParams.get("code");
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
