@@ -1,6 +1,10 @@
 import type { User } from "@supabase/supabase-js";
 
 export function needsPasswordSetup(user: User): boolean {
+  if (user.app_metadata?.password_setup_complete === true) {
+    return false;
+  }
+
   if (user.app_metadata?.require_password_setup === true) {
     return true;
   }

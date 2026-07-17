@@ -47,8 +47,11 @@ export function AuthHashHandler({ next, type }: AuthHashHandlerProps) {
         passwordSetupComplete: user.app_metadata?.password_setup_complete === true,
       });
 
-      if (mustSetPassword) {
-        await fetch("/api/auth/prepare-invite-session", { method: "POST" });
+      // Invite / recovery links should always land on password setup.
+      if (mustSetPassword || resolvedType === "invite" || resolvedType === "recovery") {
+        await fetch("/api/auth/prepare-invite-session", { method: "POST" }).catch(
+          () => undefined
+        );
         window.location.replace("/auth/set-password");
         return;
       }

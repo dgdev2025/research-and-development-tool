@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { getSiteUrl } from "@/lib/env";
 import { shouldRequirePasswordSetup } from "@/lib/authRedirect";
 import { markPasswordSetupRequired } from "@/lib/authAdmin";
+import { createAuthCallbackClient } from "@/lib/supabase/routeHandlerClient";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
@@ -12,6 +12,7 @@ export async function GET(request: Request) {
   const siteUrl = getSiteUrl(request);
 
   if (!code) {
+    // Hash-based invite tokens are handled client-side; keep the URL hash.
     const rewriteUrl = new URL(requestUrl.toString());
     rewriteUrl.pathname = "/auth/hash-handler";
     if (!rewriteUrl.searchParams.has("next")) {
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
     return NextResponse.rewrite(rewriteUrl);
   }
 
-  const supabase = await createClient();
+  const { supabase, applyCookies } = await createAuthCallbackClient();
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error || !data.user) {
@@ -41,11 +42,12 @@ export async function GET(request: Request) {
 
   if (mustSetPassword) {
     await markPasswordSetupRequired(data.user.id);
-    return NextResponse.redirect(`${siteUrl}/auth/set-password`);
+    await supabase.auth.refreshSession().catch(() => undefined);
+    return applyCookies(NextResponse.redirect(`${siteUrl}/auth/set-password`));
   }
 
   const safeNext =
     next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
 
-  return NextResponse.redirect(`${siteUrl}${safeNext}`);
+  return applyCookies(NextResponse.redirect(`${siteUrl}${safeNext}`));
 }
