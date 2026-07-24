@@ -9,6 +9,7 @@ import {
   getCheckBackStatusPrefix,
 } from "@/lib/checkback";
 import { resolveCardOpen } from "@/lib/feedViewState";
+import { displayName } from "@/lib/profiles";
 import type { FeedItemLocation } from "@/lib/parseFeed";
 import { ItemCard } from "./ItemCard";
 import { CheckBackDatePicker } from "./CheckBackDatePicker";
@@ -32,8 +33,8 @@ interface CheckBackStripProps {
   onToggleStrip: () => void;
   onToggleEntry: (cardId: string) => void;
   onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
-  onDone: (sourceFeedId: string, cardId: string) => Promise<void>;
-  onExtend: (sourceFeedId: string, cardId: string, date: string) => Promise<void>;
+  onDone: (checkBackId: string) => Promise<void>;
+  onExtend: (checkBackId: string, date: string) => Promise<void>;
   onCommentCountChange: (cardId: string, delta: number) => void;
 }
 
@@ -86,19 +87,13 @@ export function CheckBackStrip({
 }: CheckBackStripProps) {
   const dueCardIds = useMemo(() => getDueCardIds(entries), [entries]);
   const dueCount = dueCardIds.length;
-  const [extendCardId, setExtendCardId] = useState<string | null>(null);
-  const [extendFeedId, setExtendFeedId] = useState<string | null>(null);
+  const [extendCheckBackId, setExtendCheckBackId] = useState<string | null>(null);
 
   if (entries.length === 0) return null;
 
-  const extendEntry =
-    extendCardId && extendFeedId
-      ? entries.find(
-          (entry) =>
-            entry.checkBack.card_id === extendCardId &&
-            entry.sourceFeedId === extendFeedId
-        )
-      : null;
+  const extendEntry = extendCheckBackId
+    ? entries.find((entry) => entry.checkBack.id === extendCheckBackId)
+    : null;
 
   return (
     <section
@@ -149,6 +144,7 @@ export function CheckBackStrip({
             const locationLabel = location.subsectionTitle
               ? `${location.categoryTitle} · ${location.subsectionTitle}`
               : location.categoryTitle;
+            const authorLabel = displayName(checkBack.author ?? null);
 
             return (
               <article
@@ -201,6 +197,9 @@ export function CheckBackStrip({
                         {formatCheckBackDate(checkBack.check_back_until)}
                       </time>
                     </span>
+                    <span className="checkback-entry-author" title="Added by">
+                      {authorLabel}
+                    </span>
                     {isForeignFeed ? (
                       <Link
                         href={`/feeds/${sourceFeedId}?card=${checkBack.card_id}`}
@@ -224,17 +223,14 @@ export function CheckBackStrip({
                     <button
                       type="button"
                       className="secondary-btn-sm"
-                      onClick={() => {
-                        setExtendCardId(checkBack.card_id);
-                        setExtendFeedId(sourceFeedId);
-                      }}
+                      onClick={() => setExtendCheckBackId(checkBack.id)}
                     >
                       Extend
                     </button>
                     <button
                       type="button"
                       className="submit-btn checkback-done-btn"
-                      onClick={() => onDone(sourceFeedId, checkBack.card_id)}
+                      onClick={() => onDone(checkBack.id)}
                     >
                       Done
                     </button>
@@ -267,18 +263,10 @@ export function CheckBackStrip({
         <CheckBackDatePicker
           cardTitle={extendEntry.location.item.title}
           onConfirm={async (date) => {
-            await onExtend(
-              extendEntry.sourceFeedId,
-              extendEntry.checkBack.card_id,
-              date
-            );
-            setExtendCardId(null);
-            setExtendFeedId(null);
+            await onExtend(extendEntry.checkBack.id, date);
+            setExtendCheckBackId(null);
           }}
-          onCancel={() => {
-            setExtendCardId(null);
-            setExtendFeedId(null);
-          }}
+          onCancel={() => setExtendCheckBackId(null)}
         />
       )}
     </section>

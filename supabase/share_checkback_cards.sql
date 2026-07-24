@@ -1,21 +1,33 @@
--- Run in Supabase SQL Editor for check-back card scheduling
--- Prefer share_checkback_cards.sql if upgrading an existing private checkback table.
+-- Make check backs team-visible: one per card, readable/editable by all authenticated users.
+-- Run in Supabase SQL Editor.
 
-create table if not exists public.user_checkback_cards (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references public.profiles (id) on delete cascade,
-  feed_id uuid not null references public.feeds (id) on delete cascade,
-  card_id text not null,
-  check_back_until date not null,
-  note text,
-  created_at timestamptz not null default now(),
-  unique (feed_id, card_id)
-);
+-- Keep a single row per feed+card (soonest due date wins).
+delete from public.user_checkback_cards a
+using public.user_checkback_cards b
+where a.feed_id = b.feed_id
+  and a.card_id = b.card_id
+  and a.id <> b.id
+  and (
+    a.check_back_until > b.check_back_until
+    or (
+      a.check_back_until = b.check_back_until
+      and a.created_at > b.created_at
+    )
+    or (
+      a.check_back_until = b.check_back_until
+      and a.created_at = b.created_at
+      and a.id::text > b.id::text
+    )
+  );
 
-create index if not exists user_checkback_cards_feed_user_idx
-  on public.user_checkback_cards (feed_id, user_id, check_back_until);
+alter table public.user_checkback_cards
+  drop constraint if exists user_checkback_cards_user_id_feed_id_card_id_key;
 
-alter table public.user_checkback_cards enable row level security;
+alter table public.user_checkback_cards
+  drop constraint if exists user_checkback_cards_feed_id_card_id_key;
+
+alter table public.user_checkback_cards
+  add constraint user_checkback_cards_feed_id_card_id_key unique (feed_id, card_id);
 
 drop policy if exists "Users can view own checkback cards" on public.user_checkback_cards;
 drop policy if exists "Users can set own checkback cards" on public.user_checkback_cards;

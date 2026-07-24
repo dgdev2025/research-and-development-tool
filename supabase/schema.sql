@@ -88,7 +88,7 @@ create table public.user_checkback_cards (
   check_back_until date not null,
   note text,
   created_at timestamptz not null default now(),
-  unique (user_id, feed_id, card_id)
+  unique (feed_id, card_id)
 );
 
 create table public.user_card_open_state (
@@ -361,26 +361,26 @@ create policy "Users can expand categories"
   to authenticated
   using (auth.uid() = user_id);
 
-create policy "Users can view own checkback cards"
+create policy "Authenticated users can view checkback cards"
   on public.user_checkback_cards for select
   to authenticated
-  using (auth.uid() = user_id);
+  using (true);
 
-create policy "Users can set own checkback cards"
+create policy "Authenticated users can set checkback cards"
   on public.user_checkback_cards for insert
   to authenticated
   with check (auth.uid() = user_id);
 
-create policy "Users can update own checkback cards"
+create policy "Authenticated users can update checkback cards"
   on public.user_checkback_cards for update
   to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (true)
+  with check (true);
 
-create policy "Users can clear own checkback cards"
+create policy "Authenticated users can clear checkback cards"
   on public.user_checkback_cards for delete
   to authenticated
-  using (auth.uid() = user_id);
+  using (true);
 
 create policy "Users can view own card open state"
   on public.user_card_open_state for select

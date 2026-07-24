@@ -846,6 +846,15 @@ button {
   color: var(--text-muted);
 }
 
+.checkback-entry-author {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.checkback-entry-author::before {
+  content: "by ";
+}
+
 .checkback-entry-feed-link {
   font-size: 0.78rem;
   font-weight: 600;

@@ -6,7 +6,7 @@ import type { ParsedFeed } from "@/lib/parseFeed";
 import { findFeedItem } from "@/lib/parseFeed";
 import {
   clearCheckBack,
-  getCheckBacksForUser,
+  getAllCheckBacks,
   getCheckBackStatus,
   setCheckBack,
   sortCheckBacks,
@@ -118,7 +118,7 @@ export function FeedDisplay({
         const supabase = createClient();
         const [hidden, checkbackRows, openStates, panelState] = await Promise.all([
           getHiddenCardIds(supabase, feedId, userId),
-          getCheckBacksForUser(supabase, userId),
+          getAllCheckBacks(supabase),
           getCardOpenStates(supabase, feedId, userId),
           getFeedPanelViewState(supabase, feedId, userId),
         ]);
@@ -434,34 +434,25 @@ export function FeedDisplay({
     [feed, feedId, feedTitle, userId]
   );
 
-  const handleDoneCheckBack = useCallback(
-    async (sourceFeedId: string, cardId: string) => {
-      try {
-        const supabase = createClient();
-        await clearCheckBack(supabase, sourceFeedId, userId, cardId);
-        setCheckBacks((prev) =>
-          prev.filter(
-            (row) => !(row.card_id === cardId && row.feed_id === sourceFeedId)
-          )
-        );
-        setPrefsError(null);
-      } catch {
-        setPrefsError("Could not clear check back.");
-      }
-    },
-    [userId]
-  );
+  const handleDoneCheckBack = useCallback(async (checkBackId: string) => {
+    try {
+      const supabase = createClient();
+      await clearCheckBack(supabase, checkBackId);
+      setCheckBacks((prev) => prev.filter((row) => row.id !== checkBackId));
+      setPrefsError(null);
+    } catch {
+      setPrefsError("Could not clear check back.");
+    }
+  }, []);
 
   const handleExtendCheckBack = useCallback(
-    async (sourceFeedId: string, cardId: string, date: string) => {
+    async (checkBackId: string, date: string) => {
       try {
         const supabase = createClient();
-        await updateCheckBackDate(supabase, sourceFeedId, userId, cardId, date);
+        await updateCheckBackDate(supabase, checkBackId, date);
         setCheckBacks((prev) =>
           prev.map((row) =>
-            row.card_id === cardId && row.feed_id === sourceFeedId
-              ? { ...row, check_back_until: date }
-              : row
+            row.id === checkBackId ? { ...row, check_back_until: date } : row
           )
         );
         setPrefsError(null);
@@ -469,7 +460,7 @@ export function FeedDisplay({
         setPrefsError("Could not update check back date.");
       }
     },
-    [userId]
+    []
   );
 
   const handleToggleShowHidden = useCallback((categoryTitle: string) => {

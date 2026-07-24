@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Profile } from "./types";
 
 export interface CheckBackRow {
   id: string;
@@ -8,9 +9,19 @@ export interface CheckBackRow {
   check_back_until: string;
   note: string | null;
   created_at: string;
+  author?: Pick<Profile, "id" | "email" | "full_name"> | null;
 }
 
 export type CheckBackStatus = "overdue" | "due_today" | "upcoming";
+
+const CHECKBACK_SELECT = `
+  *,
+  author:profiles!user_id (
+    id,
+    email,
+    full_name
+  )
+`;
 
 function startOfDay(date: Date): Date {
   const next = new Date(date);
@@ -54,31 +65,36 @@ export function addDaysToDate(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-export async function getCheckBacksForUser(
-  supabase: SupabaseClient,
-  userId: string
+export async function getAllCheckBacks(
+  supabase: SupabaseClient
 ): Promise<CheckBackRow[]> {
   const { data, error } = await supabase
     .from("user_checkback_cards")
-    .select("*")
-    .eq("user_id", userId)
+    .select(CHECKBACK_SELECT)
     .order("check_back_until", { ascending: true });
 
   if (error) throw error;
   return (data ?? []) as CheckBackRow[];
 }
 
-/** @deprecated Prefer getCheckBacksForUser — kept for compatibility. */
+/** @deprecated Prefer getAllCheckBacks — kept for compatibility. */
+export async function getCheckBacksForUser(
+  supabase: SupabaseClient,
+  _userId?: string
+): Promise<CheckBackRow[]> {
+  return getAllCheckBacks(supabase);
+}
+
+/** @deprecated Prefer getAllCheckBacks — kept for compatibility. */
 export async function getCheckBacksForFeed(
   supabase: SupabaseClient,
   feedId: string,
-  userId: string
+  _userId?: string
 ): Promise<CheckBackRow[]> {
   const { data, error } = await supabase
     .from("user_checkback_cards")
-    .select("*")
+    .select(CHECKBACK_SELECT)
     .eq("feed_id", feedId)
-    .eq("user_id", userId)
     .order("check_back_until", { ascending: true });
 
   if (error) throw error;
@@ -105,9 +121,9 @@ export async function setCheckBack(
         check_back_until: params.checkBackUntil,
         note: params.note?.trim() || null,
       },
-      { onConflict: "user_id,feed_id,card_id" }
+      { onConflict: "feed_id,card_id" }
     )
-    .select("*")
+    .select(CHECKBACK_SELECT)
     .single();
 
   if (error) throw error;
@@ -116,33 +132,25 @@ export async function setCheckBack(
 
 export async function updateCheckBackDate(
   supabase: SupabaseClient,
-  feedId: string,
-  userId: string,
-  cardId: string,
+  checkBackId: string,
   checkBackUntil: string
 ): Promise<void> {
   const { error } = await supabase
     .from("user_checkback_cards")
     .update({ check_back_until: checkBackUntil })
-    .eq("feed_id", feedId)
-    .eq("user_id", userId)
-    .eq("card_id", cardId);
+    .eq("id", checkBackId);
 
   if (error) throw error;
 }
 
 export async function clearCheckBack(
   supabase: SupabaseClient,
-  feedId: string,
-  userId: string,
-  cardId: string
+  checkBackId: string
 ): Promise<void> {
   const { error } = await supabase
     .from("user_checkback_cards")
     .delete()
-    .eq("feed_id", feedId)
-    .eq("user_id", userId)
-    .eq("card_id", cardId);
+    .eq("id", checkBackId);
 
   if (error) throw error;
 }
