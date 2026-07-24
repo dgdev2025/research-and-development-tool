@@ -7,7 +7,6 @@ import { findFeedItem } from "@/lib/parseFeed";
 import {
   clearCheckBack,
   getAllCheckBacks,
-  getCheckBackStatus,
   setCheckBack,
   sortCheckBacks,
   updateCheckBackDate,
@@ -52,15 +51,6 @@ function countItems(feed: ParsedFeed): number {
     const subTotal = cat.subsections.reduce((s, sub) => s + sub.items.length, 0);
     return total + cat.items.length + subTotal;
   }, 0);
-}
-
-function getDueCardIdsFromRows(rows: CheckBackRow[]): string[] {
-  return rows
-    .filter((row) => {
-      const status = getCheckBackStatus(row.check_back_until);
-      return status === "overdue" || status === "due_today";
-    })
-    .map((row) => row.card_id);
 }
 
 export function FeedDisplay({
@@ -165,13 +155,9 @@ export function FeedDisplay({
           openStates
         );
 
-        const dueCardIds = getDueCardIdsFromRows(checkbackRows);
-        const stripOpen =
-          panelState.checkbackStripOpen ?? (dueCardIds.length > 0 ? true : false);
-        const expandedIds = new Set([
-          ...panelState.expandedCheckBackCardIds,
-          ...dueCardIds,
-        ]);
+        // Strip stays collapsed by default; only reopen if the user left it open.
+        const stripOpen = panelState.checkbackStripOpen ?? false;
+        const expandedIds = new Set(panelState.expandedCheckBackCardIds);
 
         if (!cancelled) {
           setHiddenCardIds(new Set(migrated.hiddenCardIds));
@@ -206,32 +192,6 @@ export function FeedDisplay({
       [feedId]: { title: feedTitle, content: feed },
     }));
   }, [feed, feedId, feedTitle]);
-
-  const dueCardIds = useMemo(
-    () => getDueCardIdsFromRows(checkBacks),
-    [checkBacks]
-  );
-
-  useEffect(() => {
-    if (!prefsLoaded || dueCardIds.length === 0) return;
-
-    const missingDue = dueCardIds.filter((cardId) => !expandedCheckBackCardIds.has(cardId));
-    if (missingDue.length === 0 && checkBackStripOpen) return;
-
-    const nextExpanded = new Set([...expandedCheckBackCardIds, ...dueCardIds]);
-    setCheckBackStripOpen(true);
-    setExpandedCheckBackCardIds(nextExpanded);
-
-    persistPanelViewState(true, [...nextExpanded]).catch(() => {
-      setPrefsError("Could not save your view preferences.");
-    });
-  }, [
-    checkBackStripOpen,
-    dueCardIds,
-    expandedCheckBackCardIds,
-    persistPanelViewState,
-    prefsLoaded,
-  ]);
 
   useEffect(() => {
     if (!targetCardId) return;
