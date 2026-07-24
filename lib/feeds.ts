@@ -56,6 +56,22 @@ export async function getFeedById(
   return data as unknown as FeedWithUploader;
 }
 
+export async function getFeedsByIds(
+  supabase: SupabaseClient,
+  ids: string[]
+): Promise<Pick<FeedRow, "id" | "title" | "content">[]> {
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  if (uniqueIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("feeds")
+    .select("id, title, content")
+    .in("id", uniqueIds);
+
+  if (error) throw error;
+  return (data ?? []) as Pick<FeedRow, "id" | "title" | "content">[];
+}
+
 export async function createFeed(
   supabase: SupabaseClient,
   title: string,

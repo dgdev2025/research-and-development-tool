@@ -8,6 +8,7 @@ import { FeedDisplay } from "@/components/FeedDisplay";
 
 interface FeedViewerProps {
   feedId: string;
+  feedTitle: string;
   initialFeed: ParsedFeed;
   userId: string;
   canReorder: boolean;
@@ -16,6 +17,7 @@ interface FeedViewerProps {
 
 export function FeedViewer({
   feedId,
+  feedTitle,
   initialFeed,
   userId,
   canReorder,
@@ -39,6 +41,7 @@ export function FeedViewer({
   return (
     <FeedDisplay
       feedId={feedId}
+      feedTitle={feedTitle}
       feed={feed}
       userId={userId}
       canReorder={canReorder}

@@ -846,6 +846,17 @@ button {
   color: var(--text-muted);
 }
 
+.checkback-entry-feed-link {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.checkback-entry-feed-link:hover {
+  text-decoration: underline;
+}
+
 .checkback-entry-note {
   display: block;
   width: 100%;

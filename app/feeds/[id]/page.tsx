@@ -52,6 +52,7 @@ export default async function FeedPage({ params }: FeedPageProps) {
 
       <FeedViewer
         feedId={feed.id}
+        feedTitle={feed.title}
         initialFeed={feed.content as ParsedFeed}
         userId={user.id}
         canReorder={isAdmin}

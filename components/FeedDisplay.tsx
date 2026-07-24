@@ -6,13 +6,15 @@ import type { ParsedFeed } from "@/lib/parseFeed";
 import { findFeedItem } from "@/lib/parseFeed";
 import {
   clearCheckBack,
-  getCheckBacksForFeed,
+  getCheckBacksForUser,
   getCheckBackStatus,
   setCheckBack,
   sortCheckBacks,
   updateCheckBackDate,
   type CheckBackRow,
 } from "@/lib/checkback";
+import { getCommentCountsByFeed } from "@/lib/comments";
+import { getFeedsByIds } from "@/lib/feeds";
 import {
   getHiddenCardIds,
   migrateLocalPreferencesIfNeeded,
@@ -36,6 +38,7 @@ import { useAutoSaveFeed } from "@/hooks/useAutoSaveFeed";
 
 interface FeedDisplayProps {
   feedId: string;
+  feedTitle: string;
   feed: ParsedFeed;
   userId: string;
   canReorder: boolean;
@@ -62,6 +65,7 @@ function getDueCardIdsFromRows(rows: CheckBackRow[]): string[] {
 
 export function FeedDisplay({
   feedId,
+  feedTitle,
   feed,
   userId,
   canReorder,
@@ -73,6 +77,12 @@ export function FeedDisplay({
   const itemCount = countItems(feed);
   const [hiddenCardIds, setHiddenCardIds] = useState<Set<string>>(new Set());
   const [checkBacks, setCheckBacks] = useState<CheckBackRow[]>([]);
+  const [checkBackFeedMap, setCheckBackFeedMap] = useState<
+    Record<string, { title: string; content: ParsedFeed }>
+  >({});
+  const [crossFeedCommentCounts, setCrossFeedCommentCounts] = useState<
+    Record<string, number>
+  >({});
   const [cardOpenStates, setCardOpenStates] = useState<Record<string, boolean>>({});
   const [checkBackStripOpen, setCheckBackStripOpen] = useState(false);
   const [expandedCheckBackCardIds, setExpandedCheckBackCardIds] = useState<Set<string>>(
@@ -108,10 +118,38 @@ export function FeedDisplay({
         const supabase = createClient();
         const [hidden, checkbackRows, openStates, panelState] = await Promise.all([
           getHiddenCardIds(supabase, feedId, userId),
-          getCheckBacksForFeed(supabase, feedId, userId),
+          getCheckBacksForUser(supabase, userId),
           getCardOpenStates(supabase, feedId, userId),
           getFeedPanelViewState(supabase, feedId, userId),
         ]);
+
+        const otherFeedIds = [
+          ...new Set(
+            checkbackRows
+              .map((row) => row.feed_id)
+              .filter((id) => id && id !== feedId)
+          ),
+        ];
+
+        const otherFeeds = await getFeedsByIds(supabase, otherFeedIds);
+        const otherCountsList = await Promise.all(
+          otherFeedIds.map((id) => getCommentCountsByFeed(supabase, id))
+        );
+
+        const nextFeedMap: Record<string, { title: string; content: ParsedFeed }> = {
+          [feedId]: { title: feedTitle, content: feed },
+        };
+        for (const row of otherFeeds) {
+          nextFeedMap[row.id] = {
+            title: row.title,
+            content: row.content as ParsedFeed,
+          };
+        }
+
+        const nextCrossCounts: Record<string, number> = {};
+        for (const counts of otherCountsList) {
+          Object.assign(nextCrossCounts, counts);
+        }
 
         const migrated = await migrateLocalPreferencesIfNeeded(
           supabase,
@@ -138,6 +176,8 @@ export function FeedDisplay({
         if (!cancelled) {
           setHiddenCardIds(new Set(migrated.hiddenCardIds));
           setCheckBacks(checkbackRows);
+          setCheckBackFeedMap(nextFeedMap);
+          setCrossFeedCommentCounts(nextCrossCounts);
           setCardOpenStates(migratedOpenStates);
           setCheckBackStripOpen(stripOpen);
           setExpandedCheckBackCardIds(expandedIds);
@@ -157,7 +197,15 @@ export function FeedDisplay({
     return () => {
       cancelled = true;
     };
-  }, [feedId, userId]);
+  }, [feedId, feedTitle, userId]);
+
+  // Keep the current feed's content in the check-back map when admins reorder/edit.
+  useEffect(() => {
+    setCheckBackFeedMap((prev) => ({
+      ...prev,
+      [feedId]: { title: feedTitle, content: feed },
+    }));
+  }, [feed, feedId, feedTitle]);
 
   const dueCardIds = useMemo(
     () => getDueCardIdsFromRows(checkBacks),
@@ -203,19 +251,42 @@ export function FeedDisplay({
   const feedSaveStatus = useAutoSaveFeed(feedId, feed, canReorder);
 
   const checkBackCardIds = useMemo(
-    () => new Set(checkBacks.map((row) => row.card_id)),
-    [checkBacks]
+    () =>
+      new Set(
+        checkBacks
+          .filter((row) => row.feed_id === feedId)
+          .map((row) => row.card_id)
+      ),
+    [checkBacks, feedId]
+  );
+
+  const mergedCommentCounts = useMemo(
+    () => ({ ...crossFeedCommentCounts, ...commentCounts }),
+    [commentCounts, crossFeedCommentCounts]
   );
 
   const checkBackEntries = useMemo(() => {
     return sortCheckBacks(checkBacks)
       .map((checkBack) => {
-        const location = findFeedItem(feed, checkBack.card_id);
+        const source =
+          checkBack.feed_id === feedId
+            ? { title: feedTitle, content: feed }
+            : checkBackFeedMap[checkBack.feed_id];
+        if (!source) return null;
+
+        const location = findFeedItem(source.content, checkBack.card_id);
         if (!location) return null;
-        return { checkBack, location };
+
+        return {
+          checkBack,
+          location,
+          feedTitle: source.title,
+          sourceFeedId: checkBack.feed_id,
+          isForeignFeed: checkBack.feed_id !== feedId,
+        };
       })
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-  }, [checkBacks, feed]);
+  }, [checkBackFeedMap, checkBacks, feed, feedId, feedTitle]);
 
   const checkBackPickerItem = checkBackPickerCardId
     ? findFeedItem(feed, checkBackPickerCardId)
@@ -345,40 +416,52 @@ export function FeedDisplay({
           note,
         });
         setCheckBacks((prev) => {
-          const next = prev.filter((item) => item.card_id !== cardId);
+          const next = prev.filter(
+            (item) => !(item.card_id === cardId && item.feed_id === feedId)
+          );
           return [...next, row];
         });
+        setCheckBackFeedMap((prev) => ({
+          ...prev,
+          [feedId]: { title: feedTitle, content: feed },
+        }));
         setCheckBackPickerCardId(null);
         setPrefsError(null);
       } catch {
         setPrefsError("Could not save check back.");
       }
     },
-    [feedId, userId]
+    [feed, feedId, feedTitle, userId]
   );
 
   const handleDoneCheckBack = useCallback(
-    async (cardId: string) => {
+    async (sourceFeedId: string, cardId: string) => {
       try {
         const supabase = createClient();
-        await clearCheckBack(supabase, feedId, userId, cardId);
-        setCheckBacks((prev) => prev.filter((row) => row.card_id !== cardId));
+        await clearCheckBack(supabase, sourceFeedId, userId, cardId);
+        setCheckBacks((prev) =>
+          prev.filter(
+            (row) => !(row.card_id === cardId && row.feed_id === sourceFeedId)
+          )
+        );
         setPrefsError(null);
       } catch {
         setPrefsError("Could not clear check back.");
       }
     },
-    [feedId, userId]
+    [userId]
   );
 
   const handleExtendCheckBack = useCallback(
-    async (cardId: string, date: string) => {
+    async (sourceFeedId: string, cardId: string, date: string) => {
       try {
         const supabase = createClient();
-        await updateCheckBackDate(supabase, feedId, userId, cardId, date);
+        await updateCheckBackDate(supabase, sourceFeedId, userId, cardId, date);
         setCheckBacks((prev) =>
           prev.map((row) =>
-            row.card_id === cardId ? { ...row, check_back_until: date } : row
+            row.card_id === cardId && row.feed_id === sourceFeedId
+              ? { ...row, check_back_until: date }
+              : row
           )
         );
         setPrefsError(null);
@@ -386,7 +469,7 @@ export function FeedDisplay({
         setPrefsError("Could not update check back date.");
       }
     },
-    [feedId, userId]
+    [userId]
   );
 
   const handleToggleShowHidden = useCallback((categoryTitle: string) => {
@@ -477,9 +560,8 @@ export function FeedDisplay({
 
       <CheckBackStrip
         entries={checkBackEntries}
-        feedId={feedId}
         userId={userId}
-        commentCounts={commentCounts}
+        commentCounts={mergedCommentCounts}
         cardOpenStates={cardOpenStates}
         forcedOpenCardId={targetCardId}
         stripOpen={checkBackStripOpen}

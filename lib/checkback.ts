@@ -54,6 +54,21 @@ export function addDaysToDate(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+export async function getCheckBacksForUser(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<CheckBackRow[]> {
+  const { data, error } = await supabase
+    .from("user_checkback_cards")
+    .select("*")
+    .eq("user_id", userId)
+    .order("check_back_until", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as CheckBackRow[];
+}
+
+/** @deprecated Prefer getCheckBacksForUser — kept for compatibility. */
 export async function getCheckBacksForFeed(
   supabase: SupabaseClient,
   feedId: string,
