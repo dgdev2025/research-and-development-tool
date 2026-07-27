@@ -1,12 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
-import { DeleteFeedButton } from "@/components/DeleteFeedButton";
-import { FeedBackLink } from "@/components/FeedBackLink";
 import { FeedViewer } from "@/components/FeedViewer";
 import { createClient } from "@/lib/supabase/server";
 import { getFeedById } from "@/lib/feeds";
 import { getCommentCountsByFeed } from "@/lib/comments";
-import { displayName, formatDate, getProfile } from "@/lib/profiles";
+import { getProfile } from "@/lib/profiles";
 import type { ParsedFeed } from "@/lib/parseFeed";
 
 interface FeedPageProps {
@@ -32,30 +30,11 @@ export default async function FeedPage({ params }: FeedPageProps) {
 
   return (
     <AppShell>
-      <div className="feed-meta-bar">
-        <div className="feed-meta-left">
-          <FeedBackLink show />
-          <div>
-            <p className="feed-record-title">{feed.title}</p>
-            <p className="feed-record-meta">
-              Uploaded by {displayName(feed.uploader)} · {formatDate(feed.created_at)}
-              {" · "}Last modified {formatDate(feed.updated_at)}
-            </p>
-          </div>
-        </div>
-        {isAdmin && (
-          <div className="feed-meta-actions">
-            <DeleteFeedButton feedId={feed.id} feedTitle={feed.title} />
-          </div>
-        )}
-      </div>
-
       <FeedViewer
-        feedId={feed.id}
-        feedTitle={feed.title}
+        feed={feed}
         initialFeed={feed.content as ParsedFeed}
         userId={user.id}
-        canReorder={isAdmin}
+        isAdmin={isAdmin}
         initialCommentCounts={commentCounts}
       />
     </AppShell>

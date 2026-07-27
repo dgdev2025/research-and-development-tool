@@ -16,6 +16,7 @@
   --success: #1433be;
   --radius: 12px;
   --shadow: 0 2px 12px rgba(20, 51, 190, 0.08);
+  --app-nav-offset: 4.5rem;
 }
 
 html,
@@ -967,6 +968,35 @@ button {
   background: var(--surface);
 }
 
+.checkback-picker-field textarea {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  resize: vertical;
+  min-height: 6rem;
+  line-height: 1.45;
+}
+
+.add-card-modal {
+  width: min(100%, 480px);
+}
+
+.feed-add-card-btn {
+  white-space: nowrap;
+  padding: 0.55rem 1rem;
+  font-size: 0.9rem;
+}
+
+.form-error {
+  margin: 0 0 0.75rem;
+  color: #b91c1c;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
 .checkback-picker-actions {
   display: flex;
   justify-content: flex-end;
@@ -1690,9 +1720,14 @@ button {
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
+  position: sticky;
+  top: var(--app-nav-offset);
+  z-index: 40;
+  margin: -0.5rem -0.5rem 1.5rem;
+  padding: 0.75rem 0.5rem 1rem;
   border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  box-shadow: 0 8px 16px -12px rgba(20, 51, 190, 0.18);
 }
 
 .feed-meta-left {
@@ -3024,6 +3059,10 @@ select.invite-field {
 }
 
 @media (max-width: 768px) {
+  :root {
+    --app-nav-offset: 7.25rem;
+  }
+
   .app-nav-inner {
     flex-wrap: wrap;
   }

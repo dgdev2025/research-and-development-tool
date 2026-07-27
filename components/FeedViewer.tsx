@@ -3,28 +3,35 @@
 import { useEffect, useState } from "react";
 import type { ParsedFeed } from "@/lib/parseFeed";
 import { createClient } from "@/lib/supabase/client";
+import { updateFeedContent } from "@/lib/feeds";
+import { prependTeamAddition } from "@/lib/feedCustomCards";
 import { prefetchMentionableProfiles } from "@/lib/mentions";
+import { displayName, formatDate } from "@/lib/profiles";
+import type { FeedWithUploader } from "@/lib/types";
+import { AddFeedCardModal } from "@/components/AddFeedCardModal";
+import { DeleteFeedButton } from "@/components/DeleteFeedButton";
+import { FeedBackLink } from "@/components/FeedBackLink";
 import { FeedDisplay } from "@/components/FeedDisplay";
 
 interface FeedViewerProps {
-  feedId: string;
-  feedTitle: string;
+  feed: FeedWithUploader;
   initialFeed: ParsedFeed;
   userId: string;
-  canReorder: boolean;
+  isAdmin: boolean;
   initialCommentCounts: Record<string, number>;
 }
 
 export function FeedViewer({
-  feedId,
-  feedTitle,
+  feed,
   initialFeed,
   userId,
-  canReorder,
+  isAdmin,
   initialCommentCounts,
 }: FeedViewerProps) {
-  const [feed, setFeed] = useState(initialFeed);
+  const [content, setContent] = useState(initialFeed);
   const [commentCounts, setCommentCounts] = useState(initialCommentCounts);
+  const [showAddCard, setShowAddCard] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -38,16 +45,64 @@ export function FeedViewer({
     }));
   };
 
+  const handleAddCard = async (title: string, body: string) => {
+    const { feed: nextFeed } = prependTeamAddition(content, { title, body });
+    const supabase = createClient();
+    await updateFeedContent(supabase, feed.id, nextFeed);
+    setContent(nextFeed);
+    setShowAddCard(false);
+    setAddError(null);
+  };
+
   return (
-    <FeedDisplay
-      feedId={feedId}
-      feedTitle={feedTitle}
-      feed={feed}
-      userId={userId}
-      canReorder={canReorder}
-      commentCounts={commentCounts}
-      onFeedChange={setFeed}
-      onCommentCountChange={handleCommentCountChange}
-    />
+    <>
+      <div className="feed-meta-bar">
+        <div className="feed-meta-left">
+          <FeedBackLink show />
+          <div>
+            <p className="feed-record-title">{feed.title}</p>
+            <p className="feed-record-meta">
+              Uploaded by {displayName(feed.uploader)} · {formatDate(feed.created_at)}
+              {" · "}Last modified {formatDate(feed.updated_at)}
+            </p>
+          </div>
+        </div>
+        <div className="feed-meta-actions">
+          <button
+            type="button"
+            className="submit-btn feed-add-card-btn"
+            onClick={() => {
+              setAddError(null);
+              setShowAddCard(true);
+            }}
+          >
+            Add New
+          </button>
+          {isAdmin && (
+            <DeleteFeedButton feedId={feed.id} feedTitle={feed.title} />
+          )}
+        </div>
+      </div>
+
+      {addError && <p className="form-error">{addError}</p>}
+
+      <FeedDisplay
+        feedId={feed.id}
+        feedTitle={feed.title}
+        feed={content}
+        userId={userId}
+        canReorder={isAdmin}
+        commentCounts={commentCounts}
+        onFeedChange={setContent}
+        onCommentCountChange={handleCommentCountChange}
+      />
+
+      {showAddCard && (
+        <AddFeedCardModal
+          onConfirm={handleAddCard}
+          onCancel={() => setShowAddCard(false)}
+        />
+      )}
+    </>
   );
 }

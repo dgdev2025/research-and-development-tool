@@ -10,7 +10,7 @@ export interface FeedItem {
   links: FeedLink[];
 }
 
-function createFeedItem(
+export function createFeedItem(
   item: Omit<FeedItem, "id">
 ): FeedItem {
   return { id: crypto.randomUUID(), ...item };

@@ -214,15 +214,11 @@ create policy "Admins can insert feeds"
     )
   );
 
-create policy "Admins can update feeds"
+create policy "Authenticated users can update feeds"
   on public.feeds for update
   to authenticated
-  using (
-    exists (
-      select 1 from public.profiles
-      where id = auth.uid() and role = 'admin'
-    )
-  );
+  using (true)
+  with check (true);
 
 create policy "Admins can delete feeds"
   on public.feeds for delete
