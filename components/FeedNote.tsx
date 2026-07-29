@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { FeedSaveStatus } from "@/hooks/useAutoSaveFeed";
+import { AutolinkNoteInput } from "./AutolinkNoteInput";
+import { LinkifiedText } from "./LinkifiedText";
 
 interface FeedNoteProps {
   note?: string;
@@ -81,20 +83,18 @@ export function FeedNote({ note = "", canEdit, saveStatus, onChange }: FeedNoteP
         {canEdit && <FeedSaveIndicator status={saveStatus} />}
       </div>
       {canEdit ? (
-        <textarea
+        <AutolinkNoteInput
           id="feed-note-input"
-          className="feed-note-input"
+          className="feed-note-input feed-note-editor"
           value={draft}
-          onChange={(event) => {
-            const next = event.target.value;
+          placeholder="Add a note for this feed..."
+          onChange={(next) => {
             setDraft(next);
             onChange(next);
           }}
-          placeholder="Add a note for this feed..."
-          rows={3}
         />
       ) : (
-        <p className="feed-note-text">{draft}</p>
+        <LinkifiedText text={draft} className="feed-note-text" />
       )}
     </section>
   );

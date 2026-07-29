@@ -13,6 +13,7 @@ import { displayName } from "@/lib/profiles";
 import type { FeedItemLocation } from "@/lib/parseFeed";
 import { ItemCard } from "./ItemCard";
 import { CheckBackDatePicker } from "./CheckBackDatePicker";
+import { LinkifiedText } from "./LinkifiedText";
 
 interface CheckBackEntry {
   checkBack: CheckBackRow;
@@ -215,7 +216,11 @@ export function CheckBackStrip({
                       <span className="checkback-entry-category">{locationLabel}</span>
                     )}
                     {checkBack.note && (
-                      <span className="checkback-entry-note">{checkBack.note}</span>
+                      <LinkifiedText
+                        text={checkBack.note}
+                        as="span"
+                        className="checkback-entry-note"
+                      />
                     )}
                   </div>
 

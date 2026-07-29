@@ -33,6 +33,7 @@ import { CheckBackDatePicker } from "./CheckBackDatePicker";
 import { CheckBackStrip } from "./CheckBackStrip";
 import { FeedDragDropProvider } from "./FeedDragDropProvider";
 import { FeedNote } from "./FeedNote";
+import { LinkifiedText } from "./LinkifiedText";
 import { useAutoSaveFeed } from "@/hooks/useAutoSaveFeed";
 
 interface FeedDisplayProps {
@@ -506,7 +507,7 @@ export function FeedDisplay({
       </FeedDragDropProvider>
 
       {feed.footer && (
-        <p className="category-note feed-footer">{feed.footer}</p>
+        <LinkifiedText text={feed.footer} className="category-note feed-footer" />
       )}
 
       <CheckBackStrip

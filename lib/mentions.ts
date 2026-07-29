@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { linkifyText } from "./linkify";
 import type { Profile } from "./types";
 
 const MENTION_REGEX = /(^|\s)(@([^\s]+))/g;
@@ -99,57 +100,8 @@ export type CommentTextPart = {
   href?: string;
 };
 
-const URL_REGEX =
-  /\b((?:https?:\/\/|www\.)[^\s<]+[^\s<.,;:!?"')\]])/gi;
-
-function normalizeCommentHref(rawUrl: string): string | null {
-  const trimmed = rawUrl.trim();
-  if (!trimmed) return null;
-
-  const withProtocol = /^https?:\/\//i.test(trimmed)
-    ? trimmed
-    : `https://${trimmed}`;
-
-  try {
-    const parsed = new URL(withProtocol);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return null;
-    }
-    return parsed.toString();
-  } catch {
-    return null;
-  }
-}
-
 function linkifyPlainText(text: string): CommentTextPart[] {
-  if (!text) return [];
-
-  const parts: CommentTextPart[] = [];
-  let lastIndex = 0;
-
-  for (const match of text.matchAll(URL_REGEX)) {
-    const rawUrl = match[0];
-    const index = match.index ?? 0;
-    const href = normalizeCommentHref(rawUrl);
-
-    if (index > lastIndex) {
-      parts.push({ text: text.slice(lastIndex, index) });
-    }
-
-    if (href) {
-      parts.push({ text: rawUrl, href });
-    } else {
-      parts.push({ text: rawUrl });
-    }
-
-    lastIndex = index + rawUrl.length;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push({ text: text.slice(lastIndex) });
-  }
-
-  return parts.length > 0 ? parts : [{ text }];
+  return linkifyText(text);
 }
 
 export function renderMentionText(

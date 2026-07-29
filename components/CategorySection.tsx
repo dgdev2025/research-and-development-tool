@@ -3,6 +3,7 @@
 import type { FeedCategory, FeedItem } from "@/lib/parseFeed";
 import { makeContainerId } from "@/lib/feedDragDrop";
 import { EmptyDroppableCardList, SortableCardList } from "./SortableCardList";
+import { LinkifiedText } from "./LinkifiedText";
 
 interface CategorySectionProps {
   category: FeedCategory;
@@ -102,7 +103,9 @@ export function CategorySection({
         )}
       </div>
 
-      {category.note && <p className="category-note">{category.note}</p>}
+      {category.note && (
+        <LinkifiedText text={category.note} className="category-note" />
+      )}
 
       {visibleItems.length > 0 ? (
         <SortableCardList

@@ -286,7 +286,24 @@ button {
     box-shadow 0.2s ease;
 }
 
-.feed-note-input:focus {
+.feed-note-editor {
+  resize: none;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  outline: none;
+  cursor: text;
+}
+
+.feed-note-editor:empty::before,
+.feed-note-editor[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.feed-note-input:focus,
+.feed-note-editor:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
@@ -300,6 +317,18 @@ button {
   margin: 0;
   padding: 0.85rem 1rem;
   white-space: pre-wrap;
+}
+
+.note-autolink {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+  cursor: pointer;
+}
+
+.note-autolink:hover {
+  color: #1029a0;
 }
 
 .category-section {
