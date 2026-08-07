@@ -87,6 +87,7 @@ interface CardCommentsContextValue {
   handleDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
   handleDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
   handleDrop: (e: React.DragEvent<HTMLDivElement>) => void;
+  handlePaste: (e: React.ClipboardEvent) => void;
   handleSubmit: (e: React.FormEvent) => void;
   startReply: (target: ReplyTarget) => void;
   clearReply: () => void;
@@ -433,6 +434,7 @@ export function CardCommentsProvider({
     handleDragOver,
     handleDragLeave,
     handleDrop,
+    handlePaste,
     handleSubmit,
     startReply,
     clearReply,
@@ -742,6 +744,7 @@ export function CardCommentPanel() {
     handleDragOver,
     handleDragLeave,
     handleDrop,
+    handlePaste,
     handleSubmit,
   } = useCardComments();
 
