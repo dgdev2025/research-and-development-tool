@@ -270,9 +270,19 @@ export function CardCommentsProvider({
   };
 
   const addImageFiles = (files: FileList | File[]) => {
-    const imagesOnly = Array.from(files).filter((file) =>
-      file.type.startsWith("image/")
-    );
+    const imagesOnly = Array.from(files)
+      .filter((file) => file.type.startsWith("image/"))
+      .map((file, index) => {
+        // Clipboard pastes often use a generic name like "image.png".
+        if (file.name && file.name !== "image.png" && file.name !== "blob") {
+          return file;
+        }
+        const ext = file.type.split("/")[1] || "png";
+        return new File([file], `clipboard-image-${Date.now()}-${index}.${ext}`, {
+          type: file.type,
+          lastModified: file.lastModified,
+        });
+      });
     if (imagesOnly.length === 0) return;
     setImageFiles((prev) => [...prev, ...imagesOnly]);
   };
@@ -298,6 +308,33 @@ export function CardCommentsProvider({
     if (e.dataTransfer.files?.length) {
       addImageFiles(e.dataTransfer.files);
     }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const clipboard = e.clipboardData;
+    if (!clipboard) return;
+
+    const fromItems: File[] = [];
+    for (const item of Array.from(clipboard.items ?? [])) {
+      if (item.kind !== "file" || !item.type.startsWith("image/")) continue;
+      const file = item.getAsFile();
+      if (file) fromItems.push(file);
+    }
+
+    const fromFiles = Array.from(clipboard.files ?? []).filter((file) =>
+      file.type.startsWith("image/")
+    );
+
+    const images = fromItems.length > 0 ? fromItems : fromFiles;
+    if (images.length === 0) return;
+
+    // Keep typed text paste; only block default when the clipboard is image-only.
+    const hasText = Boolean(clipboard.getData("text/plain")?.trim());
+    if (!hasText) {
+      e.preventDefault();
+    }
+
+    addImageFiles(images);
   };
 
   const startReply = (target: ReplyTarget) => {
@@ -1003,6 +1040,7 @@ export function CardCommentPanel() {
                 updateMentionSuggestions(nextValue, e.target.selectionStart ?? nextValue.length);
                 adjustTextareaHeight();
               }}
+              onPaste={handlePaste}
               onScroll={(e) => {
                 if (highlightRef.current) {
                   highlightRef.current.scrollTop = e.currentTarget.scrollTop;
@@ -1051,7 +1089,7 @@ export function CardCommentPanel() {
                   ? "Drop images to attach..."
                   : replyingTo
                     ? `Reply to ${replyingTo.authorEmail}...`
-                    : "Write a comment..."
+                    : "Write a comment... (paste or drop images)"
               }
               rows={1}
               className="comment-input-textarea"
