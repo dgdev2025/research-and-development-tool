@@ -19,6 +19,7 @@ interface ItemCardProps {
   onToggleOpen?: () => void;
   onToggleHide?: () => void;
   onCheckBack?: () => void;
+  onEditCard?: () => void;
   onCommentAdded?: () => void;
 }
 
@@ -33,6 +34,7 @@ export function ItemCard({
   onToggleOpen,
   onToggleHide,
   onCheckBack,
+  onEditCard,
   onCommentAdded,
 }: ItemCardProps) {
   const cardOpen = lockOpen ? true : isOpen;
@@ -100,6 +102,28 @@ export function ItemCard({
           )}
         </span>
         <div className="item-card-actions">
+          {onEditCard && (
+            <button
+              type="button"
+              className="edit-card-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditCard();
+              }}
+              aria-label="Edit card"
+              title="Edit card"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          )}
           {onCheckBack && (
             <button
               type="button"

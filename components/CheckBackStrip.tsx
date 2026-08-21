@@ -36,6 +36,7 @@ interface CheckBackStripProps {
   onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
   onDone: (checkBackId: string) => Promise<void>;
   onExtend: (checkBackId: string, date: string) => Promise<void>;
+  onEditCard?: (cardId: string) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
 }
 
@@ -84,6 +85,7 @@ export function CheckBackStrip({
   onToggleCardOpen,
   onDone,
   onExtend,
+  onEditCard,
   onCommentCountChange,
 }: CheckBackStripProps) {
   const dueCardIds = useMemo(() => getDueCardIds(entries), [entries]);
@@ -253,6 +255,11 @@ export function CheckBackStrip({
                       !isForeignFeed && forcedOpenCardId === location.item.id
                     }
                     onToggleOpen={() => onToggleCardOpen(location.item.id)}
+                    onEditCard={
+                      !isForeignFeed && onEditCard
+                        ? () => onEditCard(location.item.id)
+                        : undefined
+                    }
                     onCommentAdded={() =>
                       onCommentCountChange(location.item.id, 1)
                     }

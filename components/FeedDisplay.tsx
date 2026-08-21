@@ -45,6 +45,7 @@ interface FeedDisplayProps {
   commentCounts: Record<string, number>;
   onFeedChange: (feed: ParsedFeed) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
+  onEditCard?: (cardId: string) => void;
 }
 
 function countItems(feed: ParsedFeed): number {
@@ -63,6 +64,7 @@ export function FeedDisplay({
   commentCounts,
   onFeedChange,
   onCommentCountChange,
+  onEditCard,
 }: FeedDisplayProps) {
   const searchParams = useSearchParams();
   const itemCount = countItems(feed);
@@ -471,6 +473,23 @@ export function FeedDisplay({
         </div>
       </header>
 
+      <CheckBackStrip
+        entries={checkBackEntries}
+        userId={userId}
+        commentCounts={mergedCommentCounts}
+        cardOpenStates={cardOpenStates}
+        forcedOpenCardId={targetCardId}
+        stripOpen={checkBackStripOpen}
+        expandedEntryIds={expandedCheckBackCardIds}
+        onToggleStrip={handleToggleCheckBackStrip}
+        onToggleEntry={handleToggleCheckBackEntry}
+        onToggleCardOpen={handleToggleCardOpen}
+        onDone={handleDoneCheckBack}
+        onExtend={handleExtendCheckBack}
+        onEditCard={onEditCard}
+        onCommentCountChange={onCommentCountChange}
+      />
+
       <FeedNote
         note={feed.note}
         canEdit={canReorder}
@@ -501,6 +520,7 @@ export function FeedDisplay({
             onToggleShowHidden={() => handleToggleShowHidden(category.title)}
             onToggleHideCard={handleToggleHideCard}
             onCheckBackCard={setCheckBackPickerCardId}
+            onEditCard={onEditCard}
             onCommentCountChange={onCommentCountChange}
           />
         ))}
@@ -509,22 +529,6 @@ export function FeedDisplay({
       {feed.footer && (
         <LinkifiedText text={feed.footer} className="category-note feed-footer" />
       )}
-
-      <CheckBackStrip
-        entries={checkBackEntries}
-        userId={userId}
-        commentCounts={mergedCommentCounts}
-        cardOpenStates={cardOpenStates}
-        forcedOpenCardId={targetCardId}
-        stripOpen={checkBackStripOpen}
-        expandedEntryIds={expandedCheckBackCardIds}
-        onToggleStrip={handleToggleCheckBackStrip}
-        onToggleEntry={handleToggleCheckBackEntry}
-        onToggleCardOpen={handleToggleCardOpen}
-        onDone={handleDoneCheckBack}
-        onExtend={handleExtendCheckBack}
-        onCommentCountChange={onCommentCountChange}
-      />
 
       {checkBackPickerItem && (
         <CheckBackDatePicker

@@ -21,6 +21,7 @@ interface CategorySectionProps {
   onToggleShowHidden: () => void;
   onToggleHideCard: (cardId: string) => void;
   onCheckBackCard: (cardId: string) => void;
+  onEditCard?: (cardId: string) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
 }
 
@@ -54,6 +55,7 @@ export function CategorySection({
   onToggleShowHidden,
   onToggleHideCard,
   onCheckBackCard,
+  onEditCard,
   onCommentCountChange,
 }: CategorySectionProps) {
   const categoryCardIds = [
@@ -122,6 +124,7 @@ export function CategorySection({
           onToggleCardOpen={onToggleCardOpen}
           onToggleHideCard={onToggleHideCard}
           onCheckBackCard={onCheckBackCard}
+          onEditCard={onEditCard}
           onCommentCountChange={onCommentCountChange}
         />
       ) : dragEnabled && canReorder ? (
@@ -162,6 +165,7 @@ export function CategorySection({
                 onToggleCardOpen={onToggleCardOpen}
                 onToggleHideCard={onToggleHideCard}
                 onCheckBackCard={onCheckBackCard}
+                onEditCard={onEditCard}
                 onCommentCountChange={onCommentCountChange}
               />
             ) : (

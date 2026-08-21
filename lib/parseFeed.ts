@@ -325,3 +325,29 @@ export function findFeedItem(
 
   return null;
 }
+
+export function updateFeedItem(
+  feed: ParsedFeed,
+  cardId: string,
+  updates: { title: string; body: string }
+): ParsedFeed {
+  const title = updates.title.trim();
+  if (!title) {
+    throw new Error("Title is required.");
+  }
+  const body = updates.body.trim();
+
+  const applyToItems = (items: FeedItem[]): FeedItem[] =>
+    items.map((item) => (item.id === cardId ? { ...item, title, body } : item));
+
+  const categories = feed.categories.map((category) => ({
+    ...category,
+    items: applyToItems(category.items),
+    subsections: category.subsections.map((subsection) => ({
+      ...subsection,
+      items: applyToItems(subsection.items),
+    })),
+  }));
+
+  return { ...feed, categories };
+}

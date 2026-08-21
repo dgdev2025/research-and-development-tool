@@ -48,6 +48,7 @@ interface SortableCardListProps {
   onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
   onToggleHideCard: (cardId: string) => void;
   onCheckBackCard?: (cardId: string) => void;
+  onEditCard?: (cardId: string) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
 }
 
@@ -63,6 +64,7 @@ function SortableCard({
   onToggleCardOpen,
   onToggleHideCard,
   onCheckBackCard,
+  onEditCard,
   onCommentCountChange,
 }: {
   item: FeedItem;
@@ -76,6 +78,7 @@ function SortableCard({
   onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
   onToggleHideCard: (cardId: string) => void;
   onCheckBackCard?: (cardId: string) => void;
+  onEditCard?: (cardId: string) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
 }) {
   const {
@@ -129,6 +132,7 @@ function SortableCard({
         onCheckBack={
           onCheckBackCard ? () => onCheckBackCard(item.id) : undefined
         }
+        onEditCard={onEditCard ? () => onEditCard(item.id) : undefined}
         onCommentAdded={() => onCommentCountChange(item.id, 1)}
       />
     </div>
@@ -146,6 +150,7 @@ function StaticCardList({
   onToggleCardOpen,
   onToggleHideCard,
   onCheckBackCard,
+  onEditCard,
   onCommentCountChange,
 }: {
   items: FeedItem[];
@@ -158,6 +163,7 @@ function StaticCardList({
   onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
   onToggleHideCard: (cardId: string) => void;
   onCheckBackCard?: (cardId: string) => void;
+  onEditCard?: (cardId: string) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
 }) {
   return (
@@ -177,6 +183,7 @@ function StaticCardList({
             onCheckBack={
               onCheckBackCard ? () => onCheckBackCard(item.id) : undefined
             }
+            onEditCard={onEditCard ? () => onEditCard(item.id) : undefined}
             onCommentAdded={() => onCommentCountChange(item.id, 1)}
           />
         </div>
@@ -261,6 +268,7 @@ export function SortableCardList({
   onToggleCardOpen,
   onToggleHideCard,
   onCheckBackCard,
+  onEditCard,
   onCommentCountChange,
 }: SortableCardListProps) {
   const { activeId, overId } = useFeedDrag();
@@ -302,6 +310,7 @@ export function SortableCardList({
         onToggleCardOpen={onToggleCardOpen}
         onToggleHideCard={onToggleHideCard}
         onCheckBackCard={onCheckBackCard}
+        onEditCard={onEditCard}
         onCommentCountChange={onCommentCountChange}
       />
     );
@@ -331,6 +340,7 @@ export function SortableCardList({
               onToggleCardOpen={onToggleCardOpen}
               onToggleHideCard={onToggleHideCard}
               onCheckBackCard={onCheckBackCard}
+              onEditCard={onEditCard}
               onCommentCountChange={onCommentCountChange}
             />
           </div>

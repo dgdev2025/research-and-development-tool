@@ -651,6 +651,30 @@ button {
   border-color: rgba(20, 51, 190, 0.4);
 }
 
+.edit-card-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  padding: 0;
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    color 0.2s;
+}
+
+.edit-card-btn:hover {
+  background: var(--accent-soft);
+  border-color: rgba(20, 51, 190, 0.4);
+  color: var(--accent);
+}
+
 .checkback-card-btn {
   flex-shrink: 0;
   display: inline-flex;
