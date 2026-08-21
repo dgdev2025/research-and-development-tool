@@ -473,23 +473,6 @@ export function FeedDisplay({
         </div>
       </header>
 
-      <CheckBackStrip
-        entries={checkBackEntries}
-        userId={userId}
-        commentCounts={mergedCommentCounts}
-        cardOpenStates={cardOpenStates}
-        forcedOpenCardId={targetCardId}
-        stripOpen={checkBackStripOpen}
-        expandedEntryIds={expandedCheckBackCardIds}
-        onToggleStrip={handleToggleCheckBackStrip}
-        onToggleEntry={handleToggleCheckBackEntry}
-        onToggleCardOpen={handleToggleCardOpen}
-        onDone={handleDoneCheckBack}
-        onExtend={handleExtendCheckBack}
-        onEditCard={onEditCard}
-        onCommentCountChange={onCommentCountChange}
-      />
-
       <FeedNote
         note={feed.note}
         canEdit={canReorder}
@@ -529,6 +512,23 @@ export function FeedDisplay({
       {feed.footer && (
         <LinkifiedText text={feed.footer} className="category-note feed-footer" />
       )}
+
+      <CheckBackStrip
+        entries={checkBackEntries}
+        userId={userId}
+        commentCounts={mergedCommentCounts}
+        cardOpenStates={cardOpenStates}
+        forcedOpenCardId={targetCardId}
+        stripOpen={checkBackStripOpen}
+        expandedEntryIds={expandedCheckBackCardIds}
+        onToggleStrip={handleToggleCheckBackStrip}
+        onToggleEntry={handleToggleCheckBackEntry}
+        onToggleCardOpen={handleToggleCardOpen}
+        onDone={handleDoneCheckBack}
+        onExtend={handleExtendCheckBack}
+        onEditCard={onEditCard}
+        onCommentCountChange={onCommentCountChange}
+      />
 
       {checkBackPickerItem && (
         <CheckBackDatePicker
