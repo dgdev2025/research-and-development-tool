@@ -1,4 +1,5 @@
--- Run in Supabase SQL Editor if your project already exists
+-- Run in Supabase SQL Editor if your project already exists.
+-- For upgrading an existing private hide table, also run share_hidden_cards.sql.
 
 create table if not exists public.user_hidden_cards (
   id uuid primary key default gen_random_uuid(),
@@ -6,7 +7,7 @@ create table if not exists public.user_hidden_cards (
   feed_id uuid not null references public.feeds (id) on delete cascade,
   card_id text not null,
   created_at timestamptz not null default now(),
-  unique (user_id, feed_id, card_id)
+  unique (feed_id, card_id)
 );
 
 create table if not exists public.user_collapsed_categories (
@@ -27,20 +28,38 @@ create index if not exists user_collapsed_categories_feed_user_idx
 alter table public.user_hidden_cards enable row level security;
 alter table public.user_collapsed_categories enable row level security;
 
-create policy "Users can view own hidden cards"
+drop policy if exists "Users can view own hidden cards" on public.user_hidden_cards;
+drop policy if exists "Users can hide cards" on public.user_hidden_cards;
+drop policy if exists "Users can unhide cards" on public.user_hidden_cards;
+drop policy if exists "Authenticated users can view hidden cards" on public.user_hidden_cards;
+drop policy if exists "Authenticated users can hide cards" on public.user_hidden_cards;
+drop policy if exists "Authenticated users can update hidden cards" on public.user_hidden_cards;
+drop policy if exists "Authenticated users can unhide cards" on public.user_hidden_cards;
+
+create policy "Authenticated users can view hidden cards"
   on public.user_hidden_cards for select
   to authenticated
-  using (auth.uid() = user_id);
+  using (true);
 
-create policy "Users can hide cards"
+create policy "Authenticated users can hide cards"
   on public.user_hidden_cards for insert
   to authenticated
   with check (auth.uid() = user_id);
 
-create policy "Users can unhide cards"
+create policy "Authenticated users can update hidden cards"
+  on public.user_hidden_cards for update
+  to authenticated
+  using (true)
+  with check (true);
+
+create policy "Authenticated users can unhide cards"
   on public.user_hidden_cards for delete
   to authenticated
-  using (auth.uid() = user_id);
+  using (true);
+
+drop policy if exists "Users can view own collapsed categories" on public.user_collapsed_categories;
+drop policy if exists "Users can collapse categories" on public.user_collapsed_categories;
+drop policy if exists "Users can expand categories" on public.user_collapsed_categories;
 
 create policy "Users can view own collapsed categories"
   on public.user_collapsed_categories for select

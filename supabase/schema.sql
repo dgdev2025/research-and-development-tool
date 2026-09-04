@@ -68,7 +68,7 @@ create table public.user_hidden_cards (
   feed_id uuid not null references public.feeds (id) on delete cascade,
   card_id text not null,
   created_at timestamptz not null default now(),
-  unique (user_id, feed_id, card_id)
+  unique (feed_id, card_id)
 );
 
 create table public.user_collapsed_categories (
@@ -327,20 +327,26 @@ create policy "Users can delete mentions they trigger"
   to authenticated
   using (auth.uid() = triggered_by_user_id);
 
-create policy "Users can view own hidden cards"
+create policy "Authenticated users can view hidden cards"
   on public.user_hidden_cards for select
   to authenticated
-  using (auth.uid() = user_id);
+  using (true);
 
-create policy "Users can hide cards"
+create policy "Authenticated users can hide cards"
   on public.user_hidden_cards for insert
   to authenticated
   with check (auth.uid() = user_id);
 
-create policy "Users can unhide cards"
+create policy "Authenticated users can update hidden cards"
+  on public.user_hidden_cards for update
+  to authenticated
+  using (true)
+  with check (true);
+
+create policy "Authenticated users can unhide cards"
   on public.user_hidden_cards for delete
   to authenticated
-  using (auth.uid() = user_id);
+  using (true);
 
 create policy "Users can view own collapsed categories"
   on public.user_collapsed_categories for select

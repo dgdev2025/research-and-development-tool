@@ -23,16 +23,16 @@ function clearLocalKey(key: string) {
   localStorage.removeItem(key);
 }
 
+/** Shared per feed — all users see the same hidden cards. */
 export async function getHiddenCardIds(
   supabase: SupabaseClient,
   feedId: string,
-  userId: string
+  _userId?: string
 ): Promise<string[]> {
   const { data, error } = await supabase
     .from("user_hidden_cards")
     .select("card_id")
-    .eq("feed_id", feedId)
-    .eq("user_id", userId);
+    .eq("feed_id", feedId);
 
   if (error) throw error;
   return (data ?? []).map((row) => row.card_id);
@@ -52,7 +52,7 @@ export async function setCardHidden(
         feed_id: feedId,
         card_id: cardId,
       },
-      { onConflict: "user_id,feed_id,card_id" }
+      { onConflict: "feed_id,card_id" }
     );
     if (error) throw error;
     return;
@@ -61,7 +61,6 @@ export async function setCardHidden(
   const { error } = await supabase
     .from("user_hidden_cards")
     .delete()
-    .eq("user_id", userId)
     .eq("feed_id", feedId)
     .eq("card_id", cardId);
 
@@ -126,19 +125,23 @@ export async function migrateLocalPreferencesIfNeeded(
   let nextHidden = hiddenCardIds;
   let nextCollapsed = collapsedCategories;
 
-  if (hiddenCardIds.length === 0 && localHidden.length > 0) {
+  // Merge any leftover local hidden cards into the shared feed list.
+  const missingLocalHidden = localHidden.filter((id) => !hiddenCardIds.includes(id));
+  if (missingLocalHidden.length > 0) {
     const { error } = await supabase.from("user_hidden_cards").upsert(
-      localHidden.map((cardId) => ({
+      missingLocalHidden.map((cardId) => ({
         user_id: userId,
         feed_id: feedId,
         card_id: cardId,
       })),
-      { onConflict: "user_id,feed_id,card_id" }
+      { onConflict: "feed_id,card_id" }
     );
     if (!error) {
-      nextHidden = localHidden;
+      nextHidden = [...new Set([...hiddenCardIds, ...missingLocalHidden])];
       clearLocalKey(hiddenKey(feedId, userId));
     }
+  } else if (localHidden.length > 0) {
+    clearLocalKey(hiddenKey(feedId, userId));
   }
 
   if (collapsedCategories.length === 0 && localCollapsed.length > 0) {
