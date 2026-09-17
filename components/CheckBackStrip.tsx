@@ -2,8 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { CheckBackRow, CheckBackStatus } from "@/lib/checkback";
+import type {
+  CheckBackRow,
+  CheckBackStatus,
+  FeedCheckBackRow,
+} from "@/lib/checkback";
 import {
+  compareCheckBackDates,
   formatCheckBackDate,
   getCheckBackStatus,
   getCheckBackStatusPrefix,
@@ -23,8 +28,25 @@ interface CheckBackEntry {
   isForeignFeed: boolean;
 }
 
+export interface FeedCheckBackEntry {
+  checkBack: FeedCheckBackRow;
+  feedTitle: string;
+  sourceFeedId: string;
+  isForeignFeed: boolean;
+}
+
+type StripItem =
+  | { kind: "card"; entry: CheckBackEntry }
+  | { kind: "feed"; entry: FeedCheckBackEntry };
+
+interface ExtendTarget {
+  kind: StripItem["kind"];
+  id: string;
+}
+
 interface CheckBackStripProps {
   entries: CheckBackEntry[];
+  feedEntries: FeedCheckBackEntry[];
   userId: string;
   commentCounts: Record<string, number>;
   cardOpenStates: Record<string, boolean>;
@@ -36,20 +58,15 @@ interface CheckBackStripProps {
   onToggleCardOpen: (cardId: string, defaultOpen?: boolean) => void;
   onDone: (checkBackId: string) => Promise<void>;
   onExtend: (checkBackId: string, date: string) => Promise<void>;
+  onAddFeedCheckBack: () => void;
+  onDoneFeedCheckBack: (checkBackId: string) => Promise<void>;
+  onExtendFeedCheckBack: (checkBackId: string, date: string) => Promise<void>;
   onEditCard?: (cardId: string) => void;
   onCommentCountChange: (cardId: string, delta: number) => void;
 }
 
 function isDueStatus(status: CheckBackStatus): boolean {
   return status === "overdue" || status === "due_today";
-}
-
-function getDueCardIds(entries: CheckBackEntry[]): string[] {
-  return entries
-    .filter((entry) =>
-      isDueStatus(getCheckBackStatus(entry.checkBack.check_back_until))
-    )
-    .map((entry) => entry.checkBack.card_id);
 }
 
 function CommentCountBadge({ count }: { count: number }) {
@@ -72,8 +89,23 @@ function CommentCountBadge({ count }: { count: number }) {
   );
 }
 
+function StatusBadge({ status, until }: { status: CheckBackStatus; until: string }) {
+  return (
+    <span className={`checkback-badge checkback-badge--${status}`}>
+      <span className="checkback-badge-label">{getCheckBackStatusPrefix(status)}</span>
+      <span className="checkback-badge-sep" aria-hidden="true">
+        ·
+      </span>
+      <time className="checkback-badge-date" dateTime={until}>
+        {formatCheckBackDate(until)}
+      </time>
+    </span>
+  );
+}
+
 export function CheckBackStrip({
   entries,
+  feedEntries,
   userId,
   commentCounts,
   cardOpenStates,
@@ -85,62 +117,168 @@ export function CheckBackStrip({
   onToggleCardOpen,
   onDone,
   onExtend,
+  onAddFeedCheckBack,
+  onDoneFeedCheckBack,
+  onExtendFeedCheckBack,
   onEditCard,
   onCommentCountChange,
 }: CheckBackStripProps) {
-  const dueCardIds = useMemo(() => getDueCardIds(entries), [entries]);
-  const dueCount = dueCardIds.length;
-  const [extendCheckBackId, setExtendCheckBackId] = useState<string | null>(null);
+  const [extendTarget, setExtendTarget] = useState<ExtendTarget | null>(null);
 
-  if (entries.length === 0) return null;
+  const items = useMemo<StripItem[]>(() => {
+    const all: StripItem[] = [
+      ...entries.map((entry) => ({ kind: "card" as const, entry })),
+      ...feedEntries.map((entry) => ({ kind: "feed" as const, entry })),
+    ];
+    return all.sort((a, b) =>
+      compareCheckBackDates(
+        a.entry.checkBack.check_back_until,
+        b.entry.checkBack.check_back_until
+      )
+    );
+  }, [entries, feedEntries]);
 
-  const extendEntry = extendCheckBackId
-    ? entries.find((entry) => entry.checkBack.id === extendCheckBackId)
+  const dueCount = items.filter((item) =>
+    isDueStatus(getCheckBackStatus(item.entry.checkBack.check_back_until))
+  ).length;
+
+  const extendItem = extendTarget
+    ? items.find(
+        (item) =>
+          item.kind === extendTarget.kind &&
+          item.entry.checkBack.id === extendTarget.id
+      )
     : null;
+
+  const extendTitle = extendItem
+    ? extendItem.kind === "card"
+      ? extendItem.entry.location.item.title
+      : extendItem.entry.checkBack.title
+    : "";
 
   return (
     <section
       className={`checkback-strip${stripOpen ? " is-open" : ""}`}
       aria-label="Check backs"
     >
-      <button
-        type="button"
-        className="checkback-strip-header-btn"
-        onClick={onToggleStrip}
-        aria-expanded={stripOpen}
-      >
-        <svg
-          className={`card-chevron${stripOpen ? " open" : ""}`}
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          aria-hidden="true"
+      <div className="checkback-strip-header">
+        <button
+          type="button"
+          className="checkback-strip-header-btn"
+          onClick={onToggleStrip}
+          aria-expanded={stripOpen}
         >
-          <path
-            d="M9 6l6 6-6 6"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <h3>Check backs</h3>
-        <span className="checkback-strip-count">
-          {entries.length} item{entries.length === 1 ? "" : "s"}
-        </span>
-        {dueCount > 0 && (
-          <span className="checkback-strip-due-pill">
-            {dueCount} due
+          <svg
+            className={`card-chevron${stripOpen ? " open" : ""}`}
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M9 6l6 6-6 6"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <h3>Check backs</h3>
+          <span className="checkback-strip-count">
+            {items.length} item{items.length === 1 ? "" : "s"}
           </span>
-        )}
-      </button>
+          {dueCount > 0 && (
+            <span className="checkback-strip-due-pill">{dueCount} due</span>
+          )}
+        </button>
+        <button
+          type="button"
+          className="secondary-btn-sm checkback-strip-add-btn"
+          onClick={onAddFeedCheckBack}
+        >
+          + Add check back
+        </button>
+      </div>
 
-      {stripOpen && (
+      {stripOpen && items.length === 0 && (
+        <p className="checkback-strip-empty">
+          No check backs yet. Add one for this feed, or use &ldquo;Add to check
+          back&rdquo; on a card.
+        </p>
+      )}
+
+      {stripOpen && items.length > 0 && (
         <div className="checkback-strip-list">
-          {entries.map((entry) => {
+          {items.map((stripItem) => {
+            if (stripItem.kind === "feed") {
+              const { checkBack, feedTitle, sourceFeedId, isForeignFeed } =
+                stripItem.entry;
+              const status = getCheckBackStatus(checkBack.check_back_until);
+
+              return (
+                <article
+                  key={`feed-${checkBack.id}`}
+                  className={`checkback-entry checkback-entry--${status} checkback-entry--feed`}
+                >
+                  <div className="checkback-entry-bar">
+                    <div className="checkback-entry-title checkback-entry-title--static">
+                      <span className="checkback-feed-tag">Feed</span>
+                      <span className="checkback-entry-title-text">
+                        {checkBack.title}
+                      </span>
+                    </div>
+
+                    <div className="checkback-entry-meta">
+                      <StatusBadge status={status} until={checkBack.check_back_until} />
+                      <span className="checkback-entry-author" title="Added by">
+                        {displayName(checkBack.author ?? null)}
+                      </span>
+                      {isForeignFeed ? (
+                        <Link
+                          href={`/feeds/${sourceFeedId}`}
+                          className="checkback-entry-feed-link"
+                          title={`Open ${feedTitle}`}
+                        >
+                          {feedTitle}
+                        </Link>
+                      ) : (
+                        <span className="checkback-entry-category">This feed</span>
+                      )}
+                      {checkBack.note && (
+                        <LinkifiedText
+                          text={checkBack.note}
+                          as="span"
+                          className="checkback-entry-note"
+                        />
+                      )}
+                    </div>
+
+                    <div className="checkback-entry-actions">
+                      <button
+                        type="button"
+                        className="secondary-btn-sm"
+                        onClick={() =>
+                          setExtendTarget({ kind: "feed", id: checkBack.id })
+                        }
+                      >
+                        Extend
+                      </button>
+                      <button
+                        type="button"
+                        className="submit-btn checkback-done-btn"
+                        onClick={() => onDoneFeedCheckBack(checkBack.id)}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            }
+
             const { checkBack, location, feedTitle, sourceFeedId, isForeignFeed } =
-              entry;
+              stripItem.entry;
             const status = getCheckBackStatus(checkBack.check_back_until);
             const isExpanded = expandedEntryIds.has(checkBack.card_id);
             const commentCount = commentCounts[location.item.id] ?? 0;
@@ -186,20 +324,7 @@ export function CheckBackStrip({
                   </button>
 
                   <div className="checkback-entry-meta">
-                    <span className={`checkback-badge checkback-badge--${status}`}>
-                      <span className="checkback-badge-label">
-                        {getCheckBackStatusPrefix(status)}
-                      </span>
-                      <span className="checkback-badge-sep" aria-hidden="true">
-                        ·
-                      </span>
-                      <time
-                        className="checkback-badge-date"
-                        dateTime={checkBack.check_back_until}
-                      >
-                        {formatCheckBackDate(checkBack.check_back_until)}
-                      </time>
-                    </span>
+                    <StatusBadge status={status} until={checkBack.check_back_until} />
                     <span className="checkback-entry-author" title="Added by">
                       {authorLabel}
                     </span>
@@ -230,7 +355,7 @@ export function CheckBackStrip({
                     <button
                       type="button"
                       className="secondary-btn-sm"
-                      onClick={() => setExtendCheckBackId(checkBack.id)}
+                      onClick={() => setExtendTarget({ kind: "card", id: checkBack.id })}
                     >
                       Extend
                     </button>
@@ -271,14 +396,18 @@ export function CheckBackStrip({
         </div>
       )}
 
-      {extendEntry && (
+      {extendItem && extendTarget && (
         <CheckBackDatePicker
-          cardTitle={extendEntry.location.item.title}
+          cardTitle={extendTitle}
           onConfirm={async (date) => {
-            await onExtend(extendEntry.checkBack.id, date);
-            setExtendCheckBackId(null);
+            if (extendTarget.kind === "feed") {
+              await onExtendFeedCheckBack(extendTarget.id, date);
+            } else {
+              await onExtend(extendTarget.id, date);
+            }
+            setExtendTarget(null);
           }}
-          onCancel={() => setExtendCheckBackId(null)}
+          onCancel={() => setExtendTarget(null)}
         />
       )}
     </section>

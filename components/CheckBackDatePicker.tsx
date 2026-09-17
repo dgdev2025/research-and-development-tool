@@ -5,7 +5,10 @@ import { addDaysToDate } from "@/lib/checkback";
 
 interface CheckBackDatePickerProps {
   cardTitle: string;
-  onConfirm: (date: string, note: string) => void;
+  heading?: string;
+  /** Show a required "what to check back on" field (feed-level check backs). */
+  withTitle?: boolean;
+  onConfirm: (date: string, note: string, title: string) => void;
   onCancel: () => void;
 }
 
@@ -18,11 +21,15 @@ const QUICK_OPTIONS = [
 
 export function CheckBackDatePicker({
   cardTitle,
+  heading = "Add to check back",
+  withTitle = false,
   onConfirm,
   onCancel,
 }: CheckBackDatePickerProps) {
   const [customDate, setCustomDate] = useState(addDaysToDate(7));
+  const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,6 +41,14 @@ export function CheckBackDatePicker({
     return () => document.removeEventListener("keydown", handleEscape);
   }, [onCancel]);
 
+  const confirm = (date: string) => {
+    if (withTitle && !title.trim()) {
+      setError("Add what to check back on.");
+      return;
+    }
+    onConfirm(date, note, title.trim());
+  };
+
   return (
     <div className="checkback-picker-overlay" onClick={onCancel}>
       <div
@@ -43,8 +58,24 @@ export function CheckBackDatePicker({
         aria-labelledby="checkback-picker-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 id="checkback-picker-title">Add to check back</h3>
+        <h3 id="checkback-picker-title">{heading}</h3>
         <p className="checkback-picker-subtitle">{cardTitle}</p>
+
+        {withTitle && (
+          <label className="checkback-picker-field">
+            What to check back on
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (error) setError(null);
+              }}
+              placeholder="e.g. Re-review pricing section with the team"
+              autoFocus
+            />
+          </label>
+        )}
 
         <div className="checkback-quick-options">
           {QUICK_OPTIONS.map((option) => (
@@ -52,7 +83,7 @@ export function CheckBackDatePicker({
               key={option.days}
               type="button"
               className="checkback-quick-btn"
-              onClick={() => onConfirm(addDaysToDate(option.days), note)}
+              onClick={() => confirm(addDaysToDate(option.days))}
             >
               {option.label}
             </button>
@@ -79,6 +110,8 @@ export function CheckBackDatePicker({
           />
         </label>
 
+        {error && <p className="form-error">{error}</p>}
+
         <div className="checkback-picker-actions">
           <button type="button" className="reset-btn" onClick={onCancel}>
             Cancel
@@ -86,7 +119,7 @@ export function CheckBackDatePicker({
           <button
             type="button"
             className="submit-btn"
-            onClick={() => onConfirm(customDate, note)}
+            onClick={() => confirm(customDate)}
           >
             Set check back
           </button>

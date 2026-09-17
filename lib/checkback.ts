@@ -155,16 +155,96 @@ export async function clearCheckBack(
   if (error) throw error;
 }
 
-export function sortCheckBacks(rows: CheckBackRow[]): CheckBackRow[] {
+export function compareCheckBackDates(a: string, b: string): number {
   const priority = { overdue: 0, due_today: 1, upcoming: 2 };
+  const priorityDiff =
+    priority[getCheckBackStatus(a)] - priority[getCheckBackStatus(b)];
+  if (priorityDiff !== 0) return priorityDiff;
+  return new Date(a).getTime() - new Date(b).getTime();
+}
 
-  return [...rows].sort((a, b) => {
-    const statusA = getCheckBackStatus(a.check_back_until);
-    const statusB = getCheckBackStatus(b.check_back_until);
-    const priorityDiff = priority[statusA] - priority[statusB];
-    if (priorityDiff !== 0) return priorityDiff;
-    return (
-      new Date(a.check_back_until).getTime() - new Date(b.check_back_until).getTime()
-    );
-  });
+export function sortCheckBacks<T extends { check_back_until: string }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) =>
+    compareCheckBackDates(a.check_back_until, b.check_back_until)
+  );
+}
+
+/** A check back on a whole feed, not tied to a specific card. */
+export interface FeedCheckBackRow {
+  id: string;
+  user_id: string;
+  feed_id: string;
+  title: string;
+  note: string | null;
+  check_back_until: string;
+  created_at: string;
+  author?: Pick<Profile, "id" | "email" | "full_name"> | null;
+}
+
+export async function getAllFeedCheckBacks(
+  supabase: SupabaseClient
+): Promise<FeedCheckBackRow[]> {
+  const { data, error } = await supabase
+    .from("feed_checkbacks")
+    .select(CHECKBACK_SELECT)
+    .order("check_back_until", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as FeedCheckBackRow[];
+}
+
+export async function createFeedCheckBack(
+  supabase: SupabaseClient,
+  params: {
+    feedId: string;
+    userId: string;
+    title: string;
+    checkBackUntil: string;
+    note?: string | null;
+  }
+): Promise<FeedCheckBackRow> {
+  const title = params.title.trim();
+  if (!title) {
+    throw new Error("Add what to check back on.");
+  }
+
+  const { data, error } = await supabase
+    .from("feed_checkbacks")
+    .insert({
+      user_id: params.userId,
+      feed_id: params.feedId,
+      title,
+      check_back_until: params.checkBackUntil,
+      note: params.note?.trim() || null,
+    })
+    .select(CHECKBACK_SELECT)
+    .single();
+
+  if (error) throw error;
+  return data as FeedCheckBackRow;
+}
+
+export async function updateFeedCheckBackDate(
+  supabase: SupabaseClient,
+  checkBackId: string,
+  checkBackUntil: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("feed_checkbacks")
+    .update({ check_back_until: checkBackUntil })
+    .eq("id", checkBackId);
+
+  if (error) throw error;
+}
+
+export async function clearFeedCheckBack(
+  supabase: SupabaseClient,
+  checkBackId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("feed_checkbacks")
+    .delete()
+    .eq("id", checkBackId);
+
+  if (error) throw error;
 }

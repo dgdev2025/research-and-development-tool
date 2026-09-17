@@ -91,6 +91,16 @@ create table public.user_checkback_cards (
   unique (feed_id, card_id)
 );
 
+create table public.feed_checkbacks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  feed_id uuid not null references public.feeds (id) on delete cascade,
+  title text not null check (length(trim(title)) > 0),
+  note text,
+  check_back_until date not null,
+  created_at timestamptz not null default now()
+);
+
 create table public.user_card_open_state (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles (id) on delete cascade,
@@ -117,6 +127,9 @@ create index user_collapsed_categories_feed_user_idx
 
 create index user_checkback_cards_feed_user_idx
   on public.user_checkback_cards (feed_id, user_id, check_back_until);
+
+create index feed_checkbacks_feed_until_idx
+  on public.feed_checkbacks (feed_id, check_back_until);
 
 create index user_card_open_state_feed_user_idx
   on public.user_card_open_state (feed_id, user_id);
@@ -173,6 +186,7 @@ alter table public.comments enable row level security;
 alter table public.user_hidden_cards enable row level security;
 alter table public.user_collapsed_categories enable row level security;
 alter table public.user_checkback_cards enable row level security;
+alter table public.feed_checkbacks enable row level security;
 alter table public.user_card_open_state enable row level security;
 alter table public.user_feed_view_state enable row level security;
 alter table public.comment_mentions enable row level security;
@@ -384,6 +398,27 @@ create policy "Authenticated users can clear checkback cards"
   to authenticated
   using (true);
 
+create policy "Authenticated users can view feed check backs"
+  on public.feed_checkbacks for select
+  to authenticated
+  using (true);
+
+create policy "Authenticated users can add feed check backs"
+  on public.feed_checkbacks for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+create policy "Authenticated users can update feed check backs"
+  on public.feed_checkbacks for update
+  to authenticated
+  using (true)
+  with check (true);
+
+create policy "Authenticated users can clear feed check backs"
+  on public.feed_checkbacks for delete
+  to authenticated
+  using (true);
+
 create policy "Users can view own card open state"
   on public.user_card_open_state for select
   to authenticated
@@ -480,3 +515,4 @@ create policy "Users can delete their own avatar"
 alter publication supabase_realtime add table public.comments;
 alter publication supabase_realtime add table public.comment_images;
 alter publication supabase_realtime add table public.comment_mentions;
+alter publication supabase_realtime add table public.user_hidden_cards;

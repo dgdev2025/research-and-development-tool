@@ -6,11 +6,16 @@ import type { ParsedFeed } from "@/lib/parseFeed";
 import { findFeedItem } from "@/lib/parseFeed";
 import {
   clearCheckBack,
+  clearFeedCheckBack,
+  createFeedCheckBack,
   getAllCheckBacks,
+  getAllFeedCheckBacks,
   setCheckBack,
   sortCheckBacks,
   updateCheckBackDate,
+  updateFeedCheckBackDate,
   type CheckBackRow,
+  type FeedCheckBackRow,
 } from "@/lib/checkback";
 import { getCommentCountsByFeed } from "@/lib/comments";
 import { getFeedsByIds } from "@/lib/feeds";
@@ -30,7 +35,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { CategorySection } from "./CategorySection";
 import { CheckBackDatePicker } from "./CheckBackDatePicker";
-import { CheckBackStrip } from "./CheckBackStrip";
+import { CheckBackStrip, type FeedCheckBackEntry } from "./CheckBackStrip";
 import { FeedDragDropProvider } from "./FeedDragDropProvider";
 import { FeedNote } from "./FeedNote";
 import { LinkifiedText } from "./LinkifiedText";
@@ -70,6 +75,8 @@ export function FeedDisplay({
   const itemCount = countItems(feed);
   const [hiddenCardIds, setHiddenCardIds] = useState<Set<string>>(new Set());
   const [checkBacks, setCheckBacks] = useState<CheckBackRow[]>([]);
+  const [feedCheckBacks, setFeedCheckBacks] = useState<FeedCheckBackRow[]>([]);
+  const [showFeedCheckBackPicker, setShowFeedCheckBackPicker] = useState(false);
   const [checkBackFeedMap, setCheckBackFeedMap] = useState<
     Record<string, { title: string; content: ParsedFeed }>
   >({});
@@ -109,16 +116,19 @@ export function FeedDisplay({
 
       try {
         const supabase = createClient();
-        const [hidden, checkbackRows, openStates, panelState] = await Promise.all([
-          getHiddenCardIds(supabase, feedId, userId),
-          getAllCheckBacks(supabase),
-          getCardOpenStates(supabase, feedId, userId),
-          getFeedPanelViewState(supabase, feedId, userId),
-        ]);
+        const [hidden, checkbackRows, feedCheckbackRows, openStates, panelState] =
+          await Promise.all([
+            getHiddenCardIds(supabase, feedId, userId),
+            getAllCheckBacks(supabase),
+            // Feed-level check backs need add_feed_checkbacks.sql; don't block the feed without it.
+            getAllFeedCheckBacks(supabase).catch(() => [] as FeedCheckBackRow[]),
+            getCardOpenStates(supabase, feedId, userId),
+            getFeedPanelViewState(supabase, feedId, userId),
+          ]);
 
         const otherFeedIds = [
           ...new Set(
-            checkbackRows
+            [...checkbackRows, ...feedCheckbackRows]
               .map((row) => row.feed_id)
               .filter((id) => id && id !== feedId)
           ),
@@ -165,6 +175,7 @@ export function FeedDisplay({
         if (!cancelled) {
           setHiddenCardIds(new Set(migrated.hiddenCardIds));
           setCheckBacks(checkbackRows);
+          setFeedCheckBacks(feedCheckbackRows);
           setCheckBackFeedMap(nextFeedMap);
           setCrossFeedCommentCounts(nextCrossCounts);
           setCardOpenStates(migratedOpenStates);
@@ -187,6 +198,44 @@ export function FeedDisplay({
       cancelled = true;
     };
   }, [feedId, feedTitle, userId]);
+
+  // Hidden cards are shared per feed; keep everyone's view in sync while the feed is open.
+  useEffect(() => {
+    const supabase = createClient();
+
+    const refreshHiddenCards = async () => {
+      try {
+        const ids = await getHiddenCardIds(supabase, feedId);
+        setHiddenCardIds(new Set(ids));
+      } catch {
+        // Keep the current state; the next change or reload will resync.
+      }
+    };
+
+    const channel = supabase
+      .channel(`hidden-cards-${feedId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "user_hidden_cards",
+          filter: `feed_id=eq.${feedId}`,
+        },
+        () => void refreshHiddenCards()
+      )
+      // Delete events can't be filtered by column, so refetch on any unhide.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "user_hidden_cards" },
+        () => void refreshHiddenCards()
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [feedId]);
 
   // Keep the current feed's content in the check-back map when admins reorder/edit.
   useEffect(() => {
@@ -250,6 +299,18 @@ export function FeedDisplay({
       })
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
   }, [checkBackFeedMap, checkBacks, feed, feedId, feedTitle]);
+
+  const feedCheckBackEntries = useMemo<FeedCheckBackEntry[]>(() => {
+    return sortCheckBacks(feedCheckBacks).map((checkBack) => ({
+      checkBack,
+      feedTitle:
+        checkBack.feed_id === feedId
+          ? feedTitle
+          : checkBackFeedMap[checkBack.feed_id]?.title ?? "Another feed",
+      sourceFeedId: checkBack.feed_id,
+      isForeignFeed: checkBack.feed_id !== feedId,
+    }));
+  }, [checkBackFeedMap, feedCheckBacks, feedId, feedTitle]);
 
   const checkBackPickerItem = checkBackPickerCardId
     ? findFeedItem(feed, checkBackPickerCardId)
@@ -426,6 +487,71 @@ export function FeedDisplay({
     []
   );
 
+  const handleAddFeedCheckBack = useCallback(
+    async (title: string, date: string, note: string) => {
+      try {
+        const supabase = createClient();
+        const row = await createFeedCheckBack(supabase, {
+          feedId,
+          userId,
+          title,
+          checkBackUntil: date,
+          note,
+        });
+        setFeedCheckBacks((prev) => [...prev, row]);
+        setShowFeedCheckBackPicker(false);
+        setPrefsError(null);
+
+        if (!checkBackStripOpen) {
+          setCheckBackStripOpen(true);
+          void persistPanelViewState(true, [...expandedCheckBackCardIds]).catch(
+            () => undefined
+          );
+        }
+      } catch {
+        setPrefsError(
+          "Could not save feed check back. Make sure add_feed_checkbacks.sql has been run in Supabase."
+        );
+      }
+    },
+    [
+      checkBackStripOpen,
+      expandedCheckBackCardIds,
+      feedId,
+      persistPanelViewState,
+      userId,
+    ]
+  );
+
+  const handleDoneFeedCheckBack = useCallback(async (checkBackId: string) => {
+    try {
+      const supabase = createClient();
+      await clearFeedCheckBack(supabase, checkBackId);
+      setFeedCheckBacks((prev) => prev.filter((row) => row.id !== checkBackId));
+      setPrefsError(null);
+    } catch {
+      setPrefsError("Could not clear check back.");
+    }
+  }, []);
+
+  const handleExtendFeedCheckBack = useCallback(
+    async (checkBackId: string, date: string) => {
+      try {
+        const supabase = createClient();
+        await updateFeedCheckBackDate(supabase, checkBackId, date);
+        setFeedCheckBacks((prev) =>
+          prev.map((row) =>
+            row.id === checkBackId ? { ...row, check_back_until: date } : row
+          )
+        );
+        setPrefsError(null);
+      } catch {
+        setPrefsError("Could not update check back date.");
+      }
+    },
+    []
+  );
+
   const handleToggleShowHidden = useCallback((categoryTitle: string) => {
     setShowHiddenByCategory((prev) => ({
       ...prev,
@@ -515,6 +641,7 @@ export function FeedDisplay({
 
       <CheckBackStrip
         entries={checkBackEntries}
+        feedEntries={feedCheckBackEntries}
         userId={userId}
         commentCounts={mergedCommentCounts}
         cardOpenStates={cardOpenStates}
@@ -526,6 +653,9 @@ export function FeedDisplay({
         onToggleCardOpen={handleToggleCardOpen}
         onDone={handleDoneCheckBack}
         onExtend={handleExtendCheckBack}
+        onAddFeedCheckBack={() => setShowFeedCheckBackPicker(true)}
+        onDoneFeedCheckBack={handleDoneFeedCheckBack}
+        onExtendFeedCheckBack={handleExtendFeedCheckBack}
         onEditCard={onEditCard}
         onCommentCountChange={onCommentCountChange}
       />
@@ -537,6 +667,18 @@ export function FeedDisplay({
             handleSetCheckBack(checkBackPickerItem.item.id, date, note)
           }
           onCancel={() => setCheckBackPickerCardId(null)}
+        />
+      )}
+
+      {showFeedCheckBackPicker && (
+        <CheckBackDatePicker
+          heading="Add feed check back"
+          cardTitle={feedTitle}
+          withTitle
+          onConfirm={(date, note, title) =>
+            handleAddFeedCheckBack(title, date, note)
+          }
+          onCancel={() => setShowFeedCheckBackPicker(false)}
         />
       )}
     </>

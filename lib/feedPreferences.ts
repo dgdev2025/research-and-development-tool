@@ -122,25 +122,11 @@ export async function migrateLocalPreferencesIfNeeded(
   const localHidden = readLocalJsonArray(hiddenKey(feedId, userId));
   const localCollapsed = readLocalJsonArray(collapsedKey(feedId, userId));
 
-  let nextHidden = hiddenCardIds;
   let nextCollapsed = collapsedCategories;
 
-  // Merge any leftover local hidden cards into the shared feed list.
-  const missingLocalHidden = localHidden.filter((id) => !hiddenCardIds.includes(id));
-  if (missingLocalHidden.length > 0) {
-    const { error } = await supabase.from("user_hidden_cards").upsert(
-      missingLocalHidden.map((cardId) => ({
-        user_id: userId,
-        feed_id: feedId,
-        card_id: cardId,
-      })),
-      { onConflict: "feed_id,card_id" }
-    );
-    if (!error) {
-      nextHidden = [...new Set([...hiddenCardIds, ...missingLocalHidden])];
-      clearLocalKey(hiddenKey(feedId, userId));
-    }
-  } else if (localHidden.length > 0) {
+  // Hidden cards are shared per feed, so the database is the only source of truth.
+  // Old per-browser lists are discarded; merging them would re-hide cards someone unhid.
+  if (localHidden.length > 0) {
     clearLocalKey(hiddenKey(feedId, userId));
   }
 
@@ -160,7 +146,7 @@ export async function migrateLocalPreferencesIfNeeded(
   }
 
   return {
-    hiddenCardIds: nextHidden,
+    hiddenCardIds,
     collapsedCategories: nextCollapsed,
   };
 }
