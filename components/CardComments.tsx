@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -132,6 +133,9 @@ export function CardCommentsProvider({
   const [error, setError] = useState<string | null>(null);
   const [sliderIndex, setSliderIndex] = useState<number | null>(null);
   const [replyingTo, setReplyingTo] = useState<ReplyTarget | null>(null);
+  // The same card can be open in the feed body and in the check backs strip;
+  // each needs its own realtime topic or the second subscribe throws.
+  const channelId = useId();
 
   const loadComments = useCallback(async () => {
     setLoading(true);
@@ -183,7 +187,7 @@ export function CardCommentsProvider({
     };
 
     const channel = supabase
-      .channel(`card-comments-${feedId}-${card.id}`)
+      .channel(`card-comments-${feedId}-${card.id}-${channelId}`)
       .on(
         "postgres_changes",
         {
@@ -242,7 +246,7 @@ export function CardCommentsProvider({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [feedId, card.id]);
+  }, [feedId, card.id, channelId]);
 
   const allImages = useMemo(() => buildImageList(comments), [comments]);
 
