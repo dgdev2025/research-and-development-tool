@@ -1057,6 +1057,23 @@ button {
   background: var(--surface);
 }
 
+.checkback-picker-field select {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface);
+}
+
+.checkback-picker-hint {
+  margin: 0 0 0.85rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
 .checkback-picker-field textarea {
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--border);

@@ -326,6 +326,121 @@ export function findFeedItem(
   return null;
 }
 
+export interface FeedHeadline {
+  categoryTitle: string;
+  subsectionTitle?: string;
+  label: string;
+}
+
+/** Every category and subsection a card can be filed under. */
+export function listFeedHeadlines(feed: ParsedFeed): FeedHeadline[] {
+  const headlines: FeedHeadline[] = [];
+
+  for (const category of feed.categories) {
+    headlines.push({ categoryTitle: category.title, label: category.title });
+
+    for (const subsection of category.subsections) {
+      headlines.push({
+        categoryTitle: category.title,
+        subsectionTitle: subsection.title,
+        label: `${category.title} · ${subsection.title}`,
+      });
+    }
+  }
+
+  return headlines;
+}
+
+export function removeFeedItem(
+  feed: ParsedFeed,
+  cardId: string
+): { feed: ParsedFeed; item: FeedItem | null } {
+  let removed: FeedItem | null = null;
+
+  const keep = (items: FeedItem[]): FeedItem[] =>
+    items.filter((item) => {
+      if (item.id !== cardId) return true;
+      removed = item;
+      return false;
+    });
+
+  const categories = feed.categories.map((category) => ({
+    ...category,
+    items: keep(category.items),
+    subsections: category.subsections.map((subsection) => ({
+      ...subsection,
+      items: keep(subsection.items),
+    })),
+  }));
+
+  return { feed: { ...feed, categories }, item: removed };
+}
+
+export function addFeedItem(
+  feed: ParsedFeed,
+  item: FeedItem,
+  target: { categoryTitle: string; subsectionTitle?: string }
+): ParsedFeed {
+  const categories = feed.categories.map((category) => {
+    if (category.title !== target.categoryTitle) return category;
+
+    if (!target.subsectionTitle) {
+      return { ...category, items: [...category.items, item] };
+    }
+
+    const hasSubsection = category.subsections.some(
+      (subsection) => subsection.title === target.subsectionTitle
+    );
+
+    return {
+      ...category,
+      subsections: hasSubsection
+        ? category.subsections.map((subsection) =>
+            subsection.title === target.subsectionTitle
+              ? { ...subsection, items: [...subsection.items, item] }
+              : subsection
+          )
+        : [
+            ...category.subsections,
+            { title: target.subsectionTitle, items: [item] },
+          ],
+    };
+  });
+
+  const categoryExists = categories.some(
+    (category) => category.title === target.categoryTitle
+  );
+
+  if (categoryExists) {
+    return { ...feed, categories };
+  }
+
+  return {
+    ...feed,
+    categories: [
+      ...categories,
+      {
+        title: target.categoryTitle,
+        items: target.subsectionTitle ? [] : [item],
+        subsections: target.subsectionTitle
+          ? [{ title: target.subsectionTitle, items: [item] }]
+          : [],
+      },
+    ],
+  };
+}
+
+/** Re-file a card under a different headline in the same feed. */
+export function moveFeedItem(
+  feed: ParsedFeed,
+  cardId: string,
+  target: { categoryTitle: string; subsectionTitle?: string }
+): ParsedFeed {
+  const { feed: withoutItem, item } = removeFeedItem(feed, cardId);
+  if (!item) return feed;
+  return addFeedItem(withoutItem, item, target);
+}
+
 export function updateFeedItem(
   feed: ParsedFeed,
   cardId: string,

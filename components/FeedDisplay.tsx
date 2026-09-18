@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ParsedFeed } from "@/lib/parseFeed";
-import { findFeedItem } from "@/lib/parseFeed";
+import {
+  addFeedItem,
+  findFeedItem,
+  listFeedHeadlines,
+  moveFeedItem,
+  removeFeedItem,
+} from "@/lib/parseFeed";
 import {
   clearCheckBack,
   clearFeedCheckBack,
@@ -18,7 +24,7 @@ import {
   type FeedCheckBackRow,
 } from "@/lib/checkback";
 import { getCommentCountsByFeed } from "@/lib/comments";
-import { getFeedsByIds } from "@/lib/feeds";
+import { getFeedsByIds, updateFeedContent } from "@/lib/feeds";
 import {
   getHiddenCardIds,
   migrateLocalPreferencesIfNeeded,
@@ -38,6 +44,7 @@ import { CheckBackDatePicker } from "./CheckBackDatePicker";
 import { CheckBackStrip, type FeedCheckBackEntry } from "./CheckBackStrip";
 import { FeedDragDropProvider } from "./FeedDragDropProvider";
 import { FeedNote } from "./FeedNote";
+import { MoveCardModal } from "./MoveCardModal";
 import { LinkifiedText } from "./LinkifiedText";
 import { useAutoSaveFeed } from "@/hooks/useAutoSaveFeed";
 
@@ -77,6 +84,7 @@ export function FeedDisplay({
   const [checkBacks, setCheckBacks] = useState<CheckBackRow[]>([]);
   const [feedCheckBacks, setFeedCheckBacks] = useState<FeedCheckBackRow[]>([]);
   const [showFeedCheckBackPicker, setShowFeedCheckBackPicker] = useState(false);
+  const [moveCheckBackId, setMoveCheckBackId] = useState<string | null>(null);
   const [checkBackFeedMap, setCheckBackFeedMap] = useState<
     Record<string, { title: string; content: ParsedFeed }>
   >({});
@@ -312,6 +320,12 @@ export function FeedDisplay({
     }));
   }, [checkBackFeedMap, feedCheckBacks, feedId, feedTitle]);
 
+  const feedHeadlines = useMemo(() => listFeedHeadlines(feed), [feed]);
+
+  const moveCheckBackEntry = moveCheckBackId
+    ? checkBackEntries.find((entry) => entry.checkBack.id === moveCheckBackId) ?? null
+    : null;
+
   const checkBackPickerItem = checkBackPickerCardId
     ? findFeedItem(feed, checkBackPickerCardId)
     : null;
@@ -487,6 +501,68 @@ export function FeedDisplay({
     []
   );
 
+  const handleMoveCheckBackCard = useCallback(
+    async (
+      checkBackId: string,
+      target: { categoryTitle: string; subsectionTitle?: string }
+    ) => {
+      const row = checkBacks.find((item) => item.id === checkBackId);
+      if (!row) return;
+
+      const supabase = createClient();
+
+      if (row.feed_id === feedId) {
+        const nextFeed = moveFeedItem(feed, row.card_id, target);
+        await updateFeedContent(supabase, feedId, nextFeed);
+        onFeedChange(nextFeed);
+        setMoveCheckBackId(null);
+        setPrefsError(null);
+        return;
+      }
+
+      const source = checkBackFeedMap[row.feed_id];
+      if (!source) {
+        throw new Error("Could not load the feed this card came from.");
+      }
+
+      const { feed: nextSource, item } = removeFeedItem(source.content, row.card_id);
+      if (!item) {
+        throw new Error("Could not find this card in its feed.");
+      }
+
+      // Re-home comments and card state first: if this fails nothing has moved yet.
+      const { error: moveError } = await supabase.rpc("move_card_to_feed", {
+        p_card_id: row.card_id,
+        p_from_feed_id: row.feed_id,
+        p_to_feed_id: feedId,
+      });
+      if (moveError) {
+        throw new Error(
+          "Could not move the card's comments. Make sure add_move_card_between_feeds.sql has been run in Supabase."
+        );
+      }
+
+      const nextFeed = addFeedItem(feed, item, target);
+      await updateFeedContent(supabase, feedId, nextFeed);
+      await updateFeedContent(supabase, row.feed_id, nextSource);
+
+      const sourceFeedId = row.feed_id;
+      setCheckBackFeedMap((prev) => ({
+        ...prev,
+        [sourceFeedId]: { ...source, content: nextSource },
+      }));
+      setCheckBacks((prev) =>
+        prev.map((item) =>
+          item.id === checkBackId ? { ...item, feed_id: feedId } : item
+        )
+      );
+      onFeedChange(nextFeed);
+      setMoveCheckBackId(null);
+      setPrefsError(null);
+    },
+    [checkBackFeedMap, checkBacks, feed, feedId, onFeedChange]
+  );
+
   const handleAddFeedCheckBack = useCallback(
     async (title: string, date: string, note: string) => {
       try {
@@ -654,6 +730,7 @@ export function FeedDisplay({
         onDone={handleDoneCheckBack}
         onExtend={handleExtendCheckBack}
         onAddFeedCheckBack={() => setShowFeedCheckBackPicker(true)}
+        onMoveCard={setMoveCheckBackId}
         onDoneFeedCheckBack={handleDoneFeedCheckBack}
         onExtendFeedCheckBack={handleExtendFeedCheckBack}
         onEditCard={onEditCard}
@@ -667,6 +744,19 @@ export function FeedDisplay({
             handleSetCheckBack(checkBackPickerItem.item.id, date, note)
           }
           onCancel={() => setCheckBackPickerCardId(null)}
+        />
+      )}
+
+      {moveCheckBackEntry && (
+        <MoveCardModal
+          cardTitle={moveCheckBackEntry.location.item.title}
+          feedTitle={feedTitle}
+          headlines={feedHeadlines}
+          isForeignFeed={moveCheckBackEntry.isForeignFeed}
+          onConfirm={(target) =>
+            handleMoveCheckBackCard(moveCheckBackEntry.checkBack.id, target)
+          }
+          onCancel={() => setMoveCheckBackId(null)}
         />
       )}
 

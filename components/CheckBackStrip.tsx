@@ -59,6 +59,7 @@ interface CheckBackStripProps {
   onDone: (checkBackId: string) => Promise<void>;
   onExtend: (checkBackId: string, date: string) => Promise<void>;
   onAddFeedCheckBack: () => void;
+  onMoveCard: (checkBackId: string) => void;
   onDoneFeedCheckBack: (checkBackId: string) => Promise<void>;
   onExtendFeedCheckBack: (checkBackId: string, date: string) => Promise<void>;
   onEditCard?: (cardId: string) => void;
@@ -118,6 +119,7 @@ export function CheckBackStrip({
   onDone,
   onExtend,
   onAddFeedCheckBack,
+  onMoveCard,
   onDoneFeedCheckBack,
   onExtendFeedCheckBack,
   onEditCard,
@@ -352,6 +354,18 @@ export function CheckBackStrip({
                   </div>
 
                   <div className="checkback-entry-actions">
+                    <button
+                      type="button"
+                      className="secondary-btn-sm"
+                      onClick={() => onMoveCard(checkBack.id)}
+                      title={
+                        isForeignFeed
+                          ? "Move this card into the feed you are viewing"
+                          : "Move this card under another headline"
+                      }
+                    >
+                      Move
+                    </button>
                     <button
                       type="button"
                       className="secondary-btn-sm"
