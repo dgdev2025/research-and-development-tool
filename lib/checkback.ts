@@ -8,8 +8,6 @@ export interface CheckBackRow {
   card_id: string;
   check_back_until: string;
   note: string | null;
-  /** True once the card was moved under a headline: show it in the feed body too. */
-  show_in_feed?: boolean;
   created_at: string;
   author?: Pick<Profile, "id" | "email" | "full_name"> | null;
 }
@@ -140,20 +138,6 @@ export async function updateCheckBackDate(
   const { error } = await supabase
     .from("user_checkback_cards")
     .update({ check_back_until: checkBackUntil })
-    .eq("id", checkBackId);
-
-  if (error) throw error;
-}
-
-/** Keep a moved card visible in the feed body, not just the check backs strip. */
-export async function setCheckBackShowInFeed(
-  supabase: SupabaseClient,
-  checkBackId: string,
-  showInFeed: boolean
-): Promise<void> {
-  const { error } = await supabase
-    .from("user_checkback_cards")
-    .update({ show_in_feed: showInFeed })
     .eq("id", checkBackId);
 
   if (error) throw error;

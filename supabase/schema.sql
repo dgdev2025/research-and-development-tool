@@ -87,8 +87,6 @@ create table public.user_checkback_cards (
   card_id text not null,
   check_back_until date not null,
   note text,
-  -- Moved cards stay visible in the feed body as well as the check backs strip.
-  show_in_feed boolean not null default false,
   created_at timestamptz not null default now(),
   unique (feed_id, card_id)
 );

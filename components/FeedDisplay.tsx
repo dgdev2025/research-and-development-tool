@@ -17,7 +17,6 @@ import {
   getAllCheckBacks,
   getAllFeedCheckBacks,
   setCheckBack,
-  setCheckBackShowInFeed,
   sortCheckBacks,
   updateCheckBackDate,
   updateFeedCheckBackDate,
@@ -271,13 +270,11 @@ export function FeedDisplay({
 
   const feedSaveStatus = useAutoSaveFeed(feedId, feed, canReorder);
 
-  // Cards with a check back are pulled out of the feed body, unless they were
-  // moved under a headline on purpose.
   const checkBackCardIds = useMemo(
     () =>
       new Set(
         checkBacks
-          .filter((row) => row.feed_id === feedId && !row.show_in_feed)
+          .filter((row) => row.feed_id === feedId)
           .map((row) => row.card_id)
       ),
     [checkBacks, feedId]
@@ -514,30 +511,15 @@ export function FeedDisplay({
 
       const supabase = createClient();
 
-      // Needs add_checkback_show_in_feed.sql; without it the move still works,
-      // the card just stays in the strip only.
-      const markVisibleInFeed = async () => {
-        try {
-          await setCheckBackShowInFeed(supabase, checkBackId, true);
-          setPrefsError(null);
-        } catch {
-          setPrefsError(
-            "Card moved, but it only shows in the check backs list. Run add_checkback_show_in_feed.sql in Supabase to show moved cards in the feed."
-          );
-        }
-      };
-
+      // Moving files the card back into the feed, so the check back is done with.
       if (row.feed_id === feedId) {
         const nextFeed = moveFeedItem(feed, row.card_id, target);
         await updateFeedContent(supabase, feedId, nextFeed);
-        await markVisibleInFeed();
-        setCheckBacks((prev) =>
-          prev.map((item) =>
-            item.id === checkBackId ? { ...item, show_in_feed: true } : item
-          )
-        );
+        await clearCheckBack(supabase, checkBackId);
+        setCheckBacks((prev) => prev.filter((item) => item.id !== checkBackId));
         onFeedChange(nextFeed);
         setMoveCheckBackId(null);
+        setPrefsError(null);
         return;
       }
 
@@ -566,22 +548,17 @@ export function FeedDisplay({
       const nextFeed = addFeedItem(feed, item, target);
       await updateFeedContent(supabase, feedId, nextFeed);
       await updateFeedContent(supabase, row.feed_id, nextSource);
-      await markVisibleInFeed();
+      await clearCheckBack(supabase, checkBackId);
 
       const sourceFeedId = row.feed_id;
       setCheckBackFeedMap((prev) => ({
         ...prev,
         [sourceFeedId]: { ...source, content: nextSource },
       }));
-      setCheckBacks((prev) =>
-        prev.map((item) =>
-          item.id === checkBackId
-            ? { ...item, feed_id: feedId, show_in_feed: true }
-            : item
-        )
-      );
+      setCheckBacks((prev) => prev.filter((item) => item.id !== checkBackId));
       onFeedChange(nextFeed);
       setMoveCheckBackId(null);
+      setPrefsError(null);
     },
     [checkBackFeedMap, checkBacks, feed, feedId, onFeedChange]
   );
